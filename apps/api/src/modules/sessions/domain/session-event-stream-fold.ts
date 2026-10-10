@@ -38,9 +38,12 @@ const THOUGHT_PLACEHOLDER = "Agent thinking updated.";
 
 const streamRowClassifications: Readonly<Record<string, StreamRowClassification>> = {
   "message.added": { phase: "added", placeholder: MESSAGE_PLACEHOLDER },
+  "message.cancelled": { phase: "completed", placeholder: MESSAGE_PLACEHOLDER },
+  "message.failed": { phase: "completed", placeholder: MESSAGE_PLACEHOLDER },
   "message.completed": { phase: "completed", placeholder: MESSAGE_PLACEHOLDER },
   "message.delta": { phase: "delta", placeholder: MESSAGE_PLACEHOLDER },
   "message.started": { phase: "started", placeholder: MESSAGE_PLACEHOLDER },
+  "thought.cancelled": { phase: "completed", placeholder: THOUGHT_PLACEHOLDER },
   "thought.completed": { phase: "completed", placeholder: THOUGHT_PLACEHOLDER },
   "thought.delta": { phase: "delta", placeholder: THOUGHT_PLACEHOLDER },
   "thought.started": { phase: "started", placeholder: THOUGHT_PLACEHOLDER },

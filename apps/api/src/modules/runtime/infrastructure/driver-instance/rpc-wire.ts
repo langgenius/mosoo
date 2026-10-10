@@ -1,11 +1,16 @@
 import { DRIVER_PROTOCOL_VERSION } from "@mosoo/agent-driver/boot";
-import { parseDriverEventEnvelope } from "@mosoo/agent-driver/events";
+import { driverRuntimeRpcSchemas } from "@mosoo/agent-driver/orpc";
 import type {
   DriverCommandUpdateInput,
   DriverCompletionInput,
   DriverEventBatchInput,
   DriverEventReceipt,
   DriverFailureInput,
+  DriverExternalToolEffectObserveInput,
+  DriverExternalToolEffectClaimInput,
+  DriverExternalToolEffectClaimOutput,
+  DriverExternalToolEffectSettleInput,
+  DriverExternalToolEffectState,
   DriverHeartbeatInput,
   DriverHeartbeatOutput,
   DriverLogBatchInput,
@@ -13,12 +18,7 @@ import type {
   DriverNextCommandInput,
   DriverReadyInput,
 } from "@mosoo/agent-driver/orpc";
-import {
-  RuntimeCommand,
-  RuntimeCommandResult,
-  RuntimeCommandStatus,
-} from "@mosoo/contracts/runtime-command";
-import { RunError } from "@mosoo/contracts/session-run";
+import { RuntimeCommand } from "@mosoo/contracts/runtime-command";
 import { NonEmptyString, PrimitiveRecord } from "@mosoo/contracts/validation";
 import { os } from "@orpc/server";
 import { type } from "arktype";
@@ -71,19 +71,9 @@ const DriverEventEnvelopeWire = type({
   "occurredAt?": "string | null | undefined",
 });
 
-const DriverEventReceiptWire = type({
-  "eventId?": "string | undefined",
-  seq: "number >= 0",
-  type: NonEmptyString,
-});
-
 const DriverEventBatchInputWire = type({
   driverInstanceId: NonEmptyString,
   events: DriverEventEnvelopeWire.array(),
-});
-
-const DriverEventBatchOutputWire = type({
-  accepted: DriverEventReceiptWire.array(),
 });
 
 const DriverLogContextWire = type({
@@ -122,14 +112,6 @@ const DriverLogBatchOutputWire = type({
   ok: "true",
 });
 
-const DriverCommandUpdateInputWire = type({
-  commandId: NonEmptyString,
-  driverInstanceId: NonEmptyString,
-  "error?": RunError,
-  "result?": RuntimeCommandResult,
-  status: RuntimeCommandStatus,
-});
-
 const DriverNextCommandInputWire = type({
   driverInstanceId: NonEmptyString,
 });
@@ -138,16 +120,16 @@ const DriverNextCommandOutputWire = type({
   command: type("null").or(RuntimeCommand),
 });
 
-const DriverCompletionInputWire = type({
-  driverInstanceId: NonEmptyString,
-});
-
-const DriverFailureInputWire = type({
-  driverInstanceId: NonEmptyString,
-  error: RunError,
-});
-
 export interface RuntimeOrpcContext {
+  onObserveExternalToolEffect(
+    input: DriverExternalToolEffectObserveInput,
+  ): Promise<DriverExternalToolEffectState>;
+  onClaimExternalToolEffect(
+    input: DriverExternalToolEffectClaimInput,
+  ): Promise<DriverExternalToolEffectClaimOutput>;
+  onSettleExternalToolEffect(
+    input: DriverExternalToolEffectSettleInput,
+  ): Promise<DriverExternalToolEffectState>;
   onCommandUpdate(input: DriverCommandUpdateInput): Promise<{ ok: true }>;
   onCompleteRun(input: DriverCompletionInput): Promise<{ ok: true }>;
   onFailRun(input: DriverFailureInput): Promise<{ ok: true }>;
@@ -162,26 +144,35 @@ export interface RuntimeOrpcContext {
 export function parseDriverEventBatchInput(
   input: typeof DriverEventBatchInputWire.infer,
 ): DriverEventBatchInput {
-  return {
-    driverInstanceId: input.driverInstanceId,
-    events: input.events.map(parseDriverEventEnvelope),
-  };
+  return driverRuntimeRpcSchemas.driver.pushEvents.input.parse(input);
 }
 
 const base = os.$context<RuntimeOrpcContext>();
 
 export const runtimeOrpcRouter = {
   driver: {
+    observeExternalToolEffect: base
+      .input(driverRuntimeRpcSchemas.driver.observeExternalToolEffect.input)
+      .output(driverRuntimeRpcSchemas.driver.observeExternalToolEffect.output)
+      .handler(async ({ context, input }) => context.onObserveExternalToolEffect(input)),
+    claimExternalToolEffect: base
+      .input(driverRuntimeRpcSchemas.driver.claimExternalToolEffect.input)
+      .output(driverRuntimeRpcSchemas.driver.claimExternalToolEffect.output)
+      .handler(async ({ context, input }) => context.onClaimExternalToolEffect(input)),
+    settleExternalToolEffect: base
+      .input(driverRuntimeRpcSchemas.driver.settleExternalToolEffect.input)
+      .output(driverRuntimeRpcSchemas.driver.settleExternalToolEffect.output)
+      .handler(async ({ context, input }) => context.onSettleExternalToolEffect(input)),
     commandUpdate: base
-      .input(DriverCommandUpdateInputWire)
+      .input(driverRuntimeRpcSchemas.driver.commandUpdate.input)
       .output(type({ ok: "true" }))
       .handler(async ({ context, input }) => context.onCommandUpdate(input)),
     completeRun: base
-      .input(DriverCompletionInputWire)
+      .input(driverRuntimeRpcSchemas.driver.completeRun.input)
       .output(type({ ok: "true" }))
       .handler(async ({ context, input }) => context.onCompleteRun(input)),
     failRun: base
-      .input(DriverFailureInputWire)
+      .input(driverRuntimeRpcSchemas.driver.failRun.input)
       .output(type({ ok: "true" }))
       .handler(async ({ context, input }) => context.onFailRun(input)),
     heartbeat: base
@@ -194,7 +185,7 @@ export const runtimeOrpcRouter = {
       .handler(async ({ context, input }) => context.onHello(input)),
     pushEvents: base
       .input(DriverEventBatchInputWire)
-      .output(DriverEventBatchOutputWire)
+      .output(driverRuntimeRpcSchemas.driver.pushEvents.output)
       .handler(async ({ context, input }) =>
         context.onPushEvents(parseDriverEventBatchInput(input)),
       ),

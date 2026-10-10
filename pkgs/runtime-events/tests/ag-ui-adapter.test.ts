@@ -119,6 +119,15 @@ describe("runtime event AG-UI adapter", () => {
             kind: "run.completed",
             occurredAt: completedAt,
             payload: {
+              checkpoint: {
+                formatVersion: 1,
+                nativeRef: {
+                  kind: "openai_thread_id",
+                  runtimeId: "openai-runtime",
+                  value: "thread-1",
+                },
+                runId: PLATFORM_ID_FIXTURES.sessionRun,
+              },
               lifecycle: "TERMINATED",
               run: {
                 completedAt,
@@ -130,6 +139,7 @@ describe("runtime event AG-UI adapter", () => {
               },
             },
             runId: PLATFORM_ID_FIXTURES.sessionRun,
+            runtimeId: "openai-runtime",
             sessionId: PLATFORM_ID_FIXTURES.session,
             traceId: "trace-envelope",
           }),
@@ -239,7 +249,7 @@ describe("runtime event AG-UI adapter", () => {
         message: "ok",
       },
       runId: PLATFORM_ID_FIXTURES.sessionRun.toLowerCase(),
-      schemaVersion: "2026-05-26",
+      schemaVersion: RUNTIME_EVENT_SCHEMA_VERSION,
       sessionId: PLATFORM_ID_FIXTURES.session.toLowerCase(),
       visibility: "participant",
     };
@@ -385,7 +395,7 @@ describe("runtime event AG-UI adapter", () => {
     ]);
   });
 
-  test("projects running tool input updates as tool args without fabricating a new start", () => {
+  test("projects full tool input as a snapshot without fabricating a new start", () => {
     const event = createRuntimeEvent({
       id: createPlatformId(),
       kind: "tool.call.updated",
@@ -400,9 +410,9 @@ describe("runtime event AG-UI adapter", () => {
 
     expect(projectRuntimeEventToAgUiSessionEvents(event)).toEqual([
       {
-        delta: '{"command":"pwd"}',
-        toolCallId: "tool-1",
-        type: EventType.TOOL_CALL_ARGS,
+        name: MOSOO_CUSTOM_EVENT.sessionToolInputUpdated.name,
+        type: EventType.CUSTOM,
+        value: { rawInput: '{"command":"pwd"}', toolCallId: "tool-1" },
       },
     ]);
   });
@@ -430,9 +440,9 @@ describe("runtime event AG-UI adapter", () => {
         type: EventType.TOOL_CALL_START,
       },
       {
-        delta: '{"command":"pwd"}',
-        toolCallId: "tool-1",
-        type: EventType.TOOL_CALL_ARGS,
+        name: MOSOO_CUSTOM_EVENT.sessionToolInputUpdated.name,
+        type: EventType.CUSTOM,
+        value: { rawInput: '{"command":"pwd"}', toolCallId: "tool-1" },
       },
     ]);
   });

@@ -80,6 +80,15 @@ every running Sandbox at once and ends in-flight turns.
 - The rollback build must accept every row the newer build admitted, such as a
   Session without an Agent. Never delete rows or invent values to fit it.
 
+## Native checkpoint cutover
+
+- Before activating a Driver that requires verified native bundles, drain its legacy instances and retain the previous API, Driver, native runtime version and checkpoint format as a tested recovery pair.
+- Legacy Sessions require manual verification of the archived native records against their committed Run before recovery under the new contract.
+  There is no automatic migration command.
+  Keep archives and metadata intact, and keep a Session on an isolated compatible deployment when its archive cannot prove that boundary.
+- Approve cutover only after stage demonstrates a new checkpoint, cold restore with current workspace edits preserved, and rejection of an unverifiable legacy checkpoint.
+  A rollback must use the retained version and format pair; changing the Driver alone does not prove that newer native records can be read.
+
 ## Runtime image namespace compatibility
 
 `MOSOO_RUNTIME_IMAGES_ENABLED` gives new runtime subjects a per-runtime Sandbox

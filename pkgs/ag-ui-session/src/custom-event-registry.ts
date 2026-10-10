@@ -68,6 +68,11 @@ export const MOSOO_CUSTOM_EVENT = {
     direction: "server",
     name: "mosoo.session.stopped",
   },
+  sessionToolInputUpdated: {
+    // Snapshots must retain their order relative to tool input deltas.
+    direction: "server",
+    name: "mosoo.session.tool.input.updated",
+  },
   sessionUsageUpdated: {
     coalescing: "replace",
     direction: "server",

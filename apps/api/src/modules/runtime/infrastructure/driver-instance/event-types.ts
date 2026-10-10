@@ -1,4 +1,5 @@
 import type { SessionUsageSummary } from "@mosoo/ag-ui-session";
+import type { DriverNativeRuntimeRef, NativeCheckpoint } from "@mosoo/agent-driver/runtime";
 import type { SandboxSubjectKind } from "@mosoo/contracts/sandbox";
 import type { SessionType } from "@mosoo/contracts/session";
 import type { SessionRunStatus } from "@mosoo/contracts/session-run";
@@ -61,8 +62,17 @@ export interface RuntimeDriverRunTransition {
   status: "cancelled" | "completed" | "failed" | "running";
 }
 
+export interface NativeSessionReset {
+  previousCheckpoint: NativeCheckpoint | null;
+  previousNativeRef: DriverNativeRuntimeRef;
+  newNativeRef: DriverNativeRuntimeRef;
+  record: ProjectedRuntimeEventRecord;
+}
+
 export interface ProjectRuntimeDriverEventsResult {
-  finalAssistantMessage: { id: string; text: string } | null;
+  checkpoint: NativeCheckpoint | null;
+  sessionReset: NativeSessionReset | null;
+  finalAssistantMessageId: string | null;
   link: RuntimeSessionLink & { sessionId: SessionId };
   liveStateChanged: boolean;
   nextLiveState: SessionLiveState;

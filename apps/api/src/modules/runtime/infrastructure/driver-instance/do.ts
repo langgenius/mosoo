@@ -22,6 +22,7 @@ import type { DriverInstanceRpcControllers } from "./rpc";
 import { DriverInstanceRpcCommandController } from "./rpc-command-controller";
 import type { DriverInstanceRpcControllerDependencies } from "./rpc-controller-dependencies";
 import { DriverInstanceRpcEventIngestionController } from "./rpc-event-ingestion-controller";
+import { DriverInstanceRpcExternalToolEffectController } from "./rpc-external-tool-effect-controller";
 import { DriverInstanceRpcHandshakeController } from "./rpc-handshake-controller";
 import { DriverInstanceRpcRunTerminalController } from "./rpc-run-terminal-controller";
 import { runtimeOrpcRouter } from "./rpc-wire";
@@ -67,6 +68,7 @@ export class DriverInstance extends DurableObject {
     this.#controllers = {
       commands: new DriverInstanceRpcCommandController(dependencies),
       events: new DriverInstanceRpcEventIngestionController(dependencies),
+      effects: new DriverInstanceRpcExternalToolEffectController(dependencies),
       handshake: new DriverInstanceRpcHandshakeController(dependencies),
       terminal: new DriverInstanceRpcRunTerminalController(dependencies),
     };

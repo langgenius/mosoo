@@ -1,3 +1,4 @@
+import type { NativeCheckpoint } from "@mosoo/agent-driver/boot";
 import type { DriverNativeRuntimeRef } from "@mosoo/agent-driver/runtime";
 import { parsePlatformId } from "@mosoo/id";
 import type {
@@ -154,6 +155,7 @@ export async function buildExecutionSpec(
     requestUrl: string;
     resolvedMcpServers: DriverResolvedMcpServer[];
     nativeResumeRef?: DriverNativeRuntimeRef | null;
+    nativeCheckpoint?: NativeCheckpoint | null;
     resolvedSkillCatalog: DriverSkillCatalogEntry[];
     resolvedSkills: Omit<DriverResolvedSkill, "downloadUrl">[];
     sessionRunId?: SessionRunId | null;
@@ -217,7 +219,7 @@ export async function buildExecutionSpec(
       cwd: organizationPath,
       mcpServers,
       nativeResumeRef: input.nativeResumeRef ?? null,
-      nativeResumeRequired: true,
+      nativeCheckpoint: input.nativeCheckpoint ?? null,
       recoveryMessages: [],
     },
     skillCatalog: input.resolvedSkillCatalog,

@@ -104,7 +104,7 @@ function readProjectedContentText(
 
   const toolCall = readRuntimeEventToolCallUpdate(event);
 
-  if (toolCall.status !== "completed" && toolCall.status !== "failed") {
+  if (toolCall.status === "running") {
     return draft.content;
   }
 
@@ -112,7 +112,7 @@ function readProjectedContentText(
   const result = toolCall.rawOutput ?? toolCall.content;
 
   if (result === null) {
-    return toolCall.status === "failed" ? `${name} failed.` : `${name} completed.`;
+    return `${name} ${toolCall.status}.`;
   }
 
   return `${name} result: ${normalizeContentText(result)}`;

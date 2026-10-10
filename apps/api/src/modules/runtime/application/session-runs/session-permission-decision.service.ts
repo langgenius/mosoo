@@ -1,6 +1,6 @@
 import type { SessionLiveState, SessionPermissionRequestView } from "@mosoo/ag-ui-session";
 import { parsePlatformId } from "@mosoo/id";
-import type { DriverInstanceId, ProjectId, SessionId } from "@mosoo/id";
+import type { DriverInstanceId, ProjectId, SessionId, SessionRunId } from "@mosoo/id";
 import type { RuntimeEventEnvelope } from "@mosoo/runtime-events";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
@@ -83,6 +83,7 @@ export async function resolveSessionPermissionDecision(
     decision: input.decision,
     driverInstanceId: requirePermissionRequestDriverInstanceId(request),
     requestId: input.requestId,
+    runId: parsePlatformId<SessionRunId>(request.runId, "session run id"),
     sessionId: input.sessionId,
   });
 
@@ -119,6 +120,7 @@ export async function rejectSessionPermissionRequests(
         decision: "reject_once",
         driverInstanceId: requirePermissionRequestDriverInstanceId(request),
         requestId: request.requestId,
+        runId: parsePlatformId<SessionRunId>(request.runId, "session run id"),
         sessionId: input.sessionId,
       });
     } catch (error) {

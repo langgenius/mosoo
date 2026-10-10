@@ -78,6 +78,11 @@ function createDatabase(): GatedTerminalLookupDatabase {
   });
 
   database.execute(`
+    CREATE TABLE driver_instance (
+      id text PRIMARY KEY NOT NULL,
+      connection_id text
+    );
+    INSERT INTO driver_instance (id, connection_id) VALUES ('${DRIVER_INSTANCE_ID}', 'connection-1');
     CREATE TABLE driver_command (
       acked_at integer,
       completed_at integer,

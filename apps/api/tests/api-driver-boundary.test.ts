@@ -5,6 +5,7 @@ import {
   DRIVER_CONTROL_PORT_MAX,
   DRIVER_CONTROL_PORT_MIN,
   DRIVER_PROTOCOL_VERSION,
+  parseNativeCheckpoint,
   parseDriverBootPayloadJson,
 } from "@mosoo/agent-driver/boot";
 import { createDefaultAgentBuiltInTools } from "@mosoo/contracts/agent";
@@ -54,12 +55,9 @@ const artifactPaths = {
 };
 
 describe("API to driver boundary", () => {
-  test.each([
-    ["cattle", true],
-    ["pet", true],
-  ] as const)(
-    "requires native recovery even when the boot input retains a historical %s label",
-    async (kind, required) => {
+  test.each(["cattle", "pet"] as const)(
+    "requires a committed native checkpoint even when the boot input retains a historical %s label",
+    async (kind) => {
       const profile = createDriverProfile();
       const historicalProfile = {
         ...profile,
@@ -75,6 +73,15 @@ describe("API to driver boundary", () => {
           runtimeId: "openai-runtime",
           value: "committed-thread",
         },
+        nativeCheckpoint: parseNativeCheckpoint({
+          formatVersion: 1,
+          runId: API_DRIVER_BOUNDARY_IDS.sessionRun,
+          nativeRef: {
+            kind: "openai_thread_id",
+            runtimeId: "openai-runtime",
+            value: "committed-thread",
+          },
+        }),
         profile: historicalProfile,
         requestUrl: "https://api.example.com/api/driver/connect",
         resolvedMcpServers: [],
@@ -97,7 +104,21 @@ describe("API to driver boundary", () => {
       const parsed = parseDriverBootPayloadJson(JSON.stringify(payload));
       expect(payload.execution.session.context).not.toHaveProperty("sandboxKind");
       expect(parsed.execution.session.context).not.toHaveProperty("sandboxKind");
-      expect(parsed.execution.session.nativeResumeRequired).toBe(required);
+      expect(parsed.execution.session.nativeCheckpoint?.nativeRef).toEqual(
+        parsed.execution.session.nativeResumeRef,
+      );
+      expect(parsed.execution.session).not.toHaveProperty("nativeResumeRequired");
+      expect(() =>
+        parseDriverBootPayloadJson(
+          JSON.stringify({
+            ...payload,
+            execution: {
+              ...payload.execution,
+              session: { ...payload.execution.session, nativeCheckpoint: null },
+            },
+          }),
+        ),
+      ).toThrow("Native checkpoint and native resume ref");
       expect(parsed.execution.session.recoveryMessages).toEqual([]);
     },
   );
@@ -395,7 +416,9 @@ describe("API to driver boundary", () => {
         error: {
           code: "runtime.failed",
           message: "Runtime driver control socket is not connected.",
+          retryable: false,
         },
+        recoverable: false,
       },
       runId: API_DRIVER_BOUNDARY_IDS.sessionRun,
     });

@@ -31,6 +31,14 @@ const MosooSessionFilesUpdatedValueSchema = type({
 
 export const MosooCustomEventSchema = type.or(
   type({
+    name: eventNameLiteral(MOSOO_CUSTOM_EVENT.sessionToolInputUpdated.name),
+    type: '"CUSTOM"',
+    value: {
+      rawInput: "string",
+      toolCallId: "string > 0",
+    },
+  }),
+  type({
     name: eventNameLiteral(MOSOO_CUSTOM_EVENT.sessionCommandsUpdated.name),
     type: '"CUSTOM"',
     value: {

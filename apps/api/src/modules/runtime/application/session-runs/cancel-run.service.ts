@@ -68,6 +68,7 @@ export async function cancelRun(
       commandId: createPlatformId<DriverCommandId>(),
       kind: "turn.cancel",
       reason: "viewer.cancelled",
+      runId,
     };
 
     try {

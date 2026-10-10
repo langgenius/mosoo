@@ -1,5 +1,5 @@
 import type { SessionMessageSegment } from "@mosoo/contracts/session";
-import { sessionMessagesTable } from "@mosoo/db";
+import { sessionEventsTable, sessionMessagesTable } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
 import type {
   DriverInstanceId,
@@ -8,7 +8,13 @@ import type {
   SessionMessageId,
   SessionRunId,
 } from "@mosoo/id";
-import { and, desc, eq } from "drizzle-orm";
+import {
+  parseRuntimeEventEnvelope,
+  readRuntimeEventMessageContent,
+  readRuntimeEventMessageDelta,
+  readRuntimeEventMessageRole,
+} from "@mosoo/runtime-events";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 
 import { logInfo, logWarn } from "../../../../platform/cloudflare/logger";
 import { getAppDatabase } from "../../../../platform/db/drizzle";
@@ -17,7 +23,8 @@ import type {
   SessionLiveStateMessage,
   SessionViewSegment,
 } from "../../../sessions/application/session-live-state.service";
-import { insertSessionMessage } from "../../../sessions/infrastructure/session-message-store.repository";
+import { prepareSessionMessageInsert } from "../../../sessions/infrastructure/session-message-store.repository";
+import type { PreparedSessionMessageInsert } from "../../../sessions/infrastructure/session-message-store.repository";
 
 function toSessionMessageSegments(segments: SessionViewSegment[]): SessionMessageSegment[] {
   const result: SessionMessageSegment[] = [];
@@ -70,18 +77,84 @@ function findAssistantMessage(
   );
 }
 
-export async function persistAssistantMessageProjection(
+export async function readDurableFinalAssistantMessageSnapshot(
   database: D1Database,
-  input: {
-    createdByAccountId: PlatformId;
-    driverInstanceId: DriverInstanceId;
-    messageId: string;
-    messageText: string;
-    sessionId: SessionId;
-    sessionRunId: SessionRunId;
-    state: SessionLiveState;
-  },
-): Promise<void> {
+  input: { messageId: string; sessionId: SessionId; sessionRunId: SessionRunId },
+): Promise<{ id: string; text: string } | null> {
+  const rows = await getAppDatabase(database)
+    .select({ canonicalEventJson: sessionEventsTable.canonicalEventJson })
+    .from(sessionEventsTable)
+    .where(
+      and(
+        eq(sessionEventsTable.sessionId, input.sessionId),
+        eq(sessionEventsTable.runId, input.sessionRunId),
+        inArray(sessionEventsTable.eventType, [
+          "message.added",
+          "message.started",
+          "message.delta",
+          "message.completed",
+          "message.cancelled",
+          "message.failed",
+        ]),
+        sql`json_extract(${sessionEventsTable.canonicalEventJson}, '$.payload.messageId') = ${input.messageId}`,
+      ),
+    )
+    .orderBy(asc(sessionEventsTable.seq))
+    .all();
+  let snapshot: string | null = null;
+  let completed = false;
+  for (const row of rows) {
+    if (row.canonicalEventJson === null) continue;
+    // These rows are message events; timing payloads use a separate host projection.
+    const event = parseRuntimeEventEnvelope(JSON.parse(row.canonicalEventJson));
+    if (
+      event.runId !== input.sessionRunId ||
+      event.sessionId !== input.sessionId ||
+      readRuntimeEventMessageRole(event) === "user"
+    )
+      return null;
+    switch (event.kind) {
+      case "message.started": {
+        snapshot = null;
+        completed = false;
+        break;
+      }
+      case "message.added": {
+        snapshot = readRuntimeEventMessageContent(event) ?? "";
+        completed = false;
+        break;
+      }
+      case "message.delta": {
+        if (snapshot !== null) snapshot += readRuntimeEventMessageDelta(event);
+        completed = false;
+        break;
+      }
+      case "message.completed": {
+        completed = snapshot !== null;
+        break;
+      }
+      default: {
+        completed = false;
+      }
+    }
+  }
+  return completed && snapshot !== null ? { id: input.messageId, text: snapshot } : null;
+}
+
+export interface AssistantMessageProjectionInput {
+  createdByAccountId: PlatformId;
+  driverInstanceId: DriverInstanceId;
+  messageId: string;
+  messageText: string;
+  sessionId: SessionId;
+  sessionRunId: SessionRunId;
+  state: SessionLiveState;
+}
+
+export async function prepareAssistantMessageProjection(
+  database: D1Database,
+  input: AssistantMessageProjectionInput,
+): Promise<PreparedSessionMessageInsert | null> {
   const message = findAssistantMessage(input.state.messages, input.messageId);
   const useStructuredProjection = message?.content === input.messageText;
 
@@ -90,7 +163,7 @@ export async function persistAssistantMessageProjection(
       driverInstanceId: input.driverInstanceId,
       finalMessageId: input.messageId,
       projectedTextLength: message.content.length,
-      reason: "RUN_FINISHED final assistant snapshot did not match the live projection",
+      reason: "Durable final assistant snapshot did not match the live projection",
       sessionId: input.sessionId,
       sessionRunId: input.sessionRunId,
       snapshotTextLength: input.messageText.length,
@@ -106,16 +179,14 @@ export async function persistAssistantMessageProjection(
   const persistedMessage = await readPersistedAssistantMessage(database, input.sessionRunId);
 
   if (persistedMessage !== null) {
-    if (persistedMessage.content !== input.messageText) {
+    if (persistedMessage.id !== messageId || persistedMessage.content !== input.messageText) {
       throw new Error(
         `Canonical final assistant message conflicts with the persisted projection for run ${input.sessionRunId}.`,
       );
     }
 
-    // Provider reconnects can replay the same canonical snapshot after the
-    // driver process has generated a new message id. The run-level text is the
-    // durable identity here: preserve the first canonical transcript row.
-    return;
+    // A replay must preserve both the selected message identity and its text.
+    return null;
   }
 
   logInfo("runtime.assistant.message.persisting", {
@@ -127,7 +198,7 @@ export async function persistAssistantMessageProjection(
     textLength: input.messageText.length,
   });
 
-  await insertSessionMessage(database, {
+  return prepareSessionMessageInsert(database, {
     content: input.messageText,
     createdByAccountId: input.createdByAccountId,
     id: messageId,

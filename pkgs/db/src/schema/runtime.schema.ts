@@ -285,6 +285,7 @@ export const externalToolEffectAttemptsTable = sqliteTable(
   "external_tool_effect_attempt",
   {
     attempt: integer("attempt").notNull(),
+    claimToken: text("claim_token"),
     completedAt: integer("completed_at"),
     createdAt: integer("created_at").notNull(),
     effectId: platformIdColumn<ExternalToolEffectId>("effect_id")
@@ -337,12 +338,15 @@ export const driverInstanceMcpGrantsTable = sqliteTable(
 export const nativeResumeRefsTable = sqliteTable(
   "native_resume_ref",
   {
+    committedFormatVersion: integer("committed_format_version"),
     committedSessionRunId: platformIdColumn<SessionRunId>("committed_session_run_id"),
     committedValue: text("committed_value"),
     createdAt: integer("created_at").notNull(),
     kind: text("kind")
       .$type<"acp_session_id" | "claude_session_id" | "openai_thread_id" | "pi_session_path">()
       .notNull(),
+    invalidatedAt: integer("invalidated_at"),
+    invalidatedSourceEventId: text("invalidated_source_event_id"),
     observedDriverInstanceId: platformIdColumn<DriverInstanceId>("observed_driver_instance_id"),
     observedSessionRunId: platformIdColumn<SessionRunId>("observed_session_run_id"),
     runtimeId: text("runtime_id")

@@ -9,7 +9,7 @@ import type {
 
 import type { DriverEventInput } from "../../driver/src/protocol/events";
 import type { RunId } from "../../driver/src/protocol/id";
-import { AcpTurnEventState } from "../../driver/src/runtimes/acp/acp-event-translator";
+import { AcpAssistantTranscriptState } from "../../driver/src/runtimes/acp/acp-assistant-transcript-state";
 import { persistSessionRuntimeEvents } from "../src/modules/sessions/infrastructure/session-runtime-event-store.repository";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
@@ -56,6 +56,7 @@ function createRuntimeEventStoreDatabase(
     );
 
     CREATE TABLE session_event (
+      canonical_event_json text,
       agent_id text NOT NULL,
       content_text text NOT NULL,
       created_at integer NOT NULL,
@@ -133,7 +134,7 @@ function createRuntimeEventStoreDatabase(
 describe("session runtime event store", () => {
   test("keeps runtime event inserts within D1's bound parameter limit", async () => {
     const database = createRuntimeEventStoreDatabase({ maxBoundParams: 100 });
-    const records = Array.from({ length: 6 }, (_, index) => {
+    const records = Array.from({ length: 64 }, (_, index) => {
       const eventId = `event-${index + 1}`;
 
       return {
@@ -160,7 +161,7 @@ describe("session runtime event store", () => {
       .prepare("SELECT seq, source_event_id FROM session_event ORDER BY seq")
       .all<{ seq: number; source_event_id: string }>();
 
-    expect(result.persistedCount).toBe(6);
+    expect(result.persistedCount).toBe(64);
     expect(rows.results).toEqual(
       records.map((record, index) => ({
         seq: index + 1,
@@ -172,7 +173,7 @@ describe("session runtime event store", () => {
     failingDatabase.execute(`
       CREATE TRIGGER reject_last_event
       BEFORE INSERT ON session_event
-      WHEN NEW.source_event_id = 'event-6'
+      WHEN NEW.source_event_id = 'event-64'
       BEGIN
         SELECT RAISE(ABORT, 'forced event insert failure');
       END;
@@ -190,6 +191,11 @@ describe("session runtime event store", () => {
       .first<{ count: number }>();
 
     expect(count?.count).toBe(0);
+    expect(
+      await failingDatabase
+        .prepare("SELECT runtime_event_seq_cursor FROM session WHERE id = 'session-1'")
+        .first<number>("runtime_event_seq_cursor"),
+    ).toBe(0);
   });
 
   test("persists mixed source ids and skips source replays before allocating sequence", async () => {
@@ -506,8 +512,8 @@ describe("session runtime event store", () => {
 
   test("persists an ACP tool through changing progress titles without an identity conflict", async () => {
     const database = createRuntimeEventStoreDatabase();
-    const state = new AcpTurnEventState();
-    state.begin({ messageId: "message-1", runId: "run-1" as RunId, sessionId: "session-1" });
+    const state = new AcpAssistantTranscriptState();
+    state.begin({ messageId: "message-1", runId: "run-1" as RunId });
     let eventIndex = 0;
 
     async function persist(events: readonly DriverEventInput[]): Promise<void> {

@@ -1,22 +1,32 @@
+import { nativeRuntimeRefsEqual, parseNativeCheckpoint } from "@mosoo/agent-driver/runtime";
+import type { NativeCheckpoint } from "@mosoo/agent-driver/runtime";
 import { nativeResumeRefsTable, sandboxBackupsTable, sessionRunsTable } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
 import type { SandboxBackupId, SandboxId, SessionId, SessionRunId } from "@mosoo/id";
+import { ORPCError } from "@orpc/server";
 import { and, eq, exists, isNull, sql } from "drizzle-orm";
 
 import { logWarn } from "../../../../platform/cloudflare/logger";
+import { withDisposedRpcResource } from "../../../../platform/cloudflare/rpc-disposal";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../../platform/db/drizzle";
 import type { AppDatabase } from "../../../../platform/db/drizzle";
 import { shouldBackupSandboxSession } from "../../../sessions/domain/session-lifecycle";
 import { isTerminalSessionRunStatus } from "../../domain/session-run-lifecycle.machine";
 import type { RuntimeSessionLink } from "../driver-instance/event-types";
+import { terminalConflict } from "../driver-instance/terminal-conflict";
+import { verifyNativeCheckpointBundle } from "../native-checkpoint-bundle";
 import { RuntimeSubjectCheckpointFailedError } from "../runtime-subject-lifecycle/runtime-subject-errors";
+import { getRuntimeSubjectKeepAliveHandle } from "../runtime-subject-lifecycle/runtime-subject-platform";
 import { SANDBOX_BACKUP_TTL_SECONDS } from "../sandbox-backup-config";
 import { createRuntimeSandboxBackup, deleteSandboxBackupObjects } from "../sandbox-backup-platform";
 import { listSandboxSessionBackupCandidates } from "../sandbox-backup-store";
 
 type NativeResumeSnapshot = Pick<
   typeof nativeResumeRefsTable.$inferSelect,
+  | "committedFormatVersion"
+  | "invalidatedAt"
+  | "invalidatedSourceEventId"
   | "kind"
   | "runtimeId"
   | "value"
@@ -27,6 +37,7 @@ type NativeResumeSnapshot = Pick<
 
 export interface SessionRunCompletionCheckpoint {
   backupId: SandboxBackupId;
+  descriptor: NativeCheckpoint;
   dir: string;
   nativeResume: NativeResumeSnapshot;
   sandboxId: SandboxId;
@@ -39,6 +50,7 @@ export interface SessionRunCompletionCheckpoint {
 export async function prepareSessionRunCompletionCheckpoint(
   bindings: ApiBindings,
   link: RuntimeSessionLink,
+  descriptor: NativeCheckpoint,
 ): Promise<SessionRunCompletionCheckpoint | undefined> {
   if (link.sandboxId === null || link.sessionId === null || link.sessionRunId === null) {
     throw new Error("Session completion requires a linked workspace.");
@@ -54,6 +66,18 @@ export async function prepareSessionRunCompletionCheckpoint(
   }
 
   try {
+    const checkpoint = parseNativeCheckpoint(descriptor);
+    if (
+      run === undefined ||
+      parsePlatformId<SessionRunId>(checkpoint.runId, "checkpoint Run") !== link.sessionRunId ||
+      checkpoint.nativeRef.runtimeId !== run.runtimeId
+    ) {
+      throw terminalConflict({
+        currentStatus: run?.status ?? null,
+        runId: link.sessionRunId,
+        reason: "Native checkpoint does not belong to this Run and runtime.",
+      });
+    }
     const targets = await listSandboxSessionBackupCandidates(bindings.DB, link.sandboxId);
     const target = targets.find((candidate) => candidate.sessionId === link.sessionId);
     if (target === undefined || !shouldBackupSandboxSession(target)) {
@@ -62,6 +86,9 @@ export async function prepareSessionRunCompletionCheckpoint(
     const nativeResume =
       (await getAppDatabase(bindings.DB)
         .select({
+          committedFormatVersion: nativeResumeRefsTable.committedFormatVersion,
+          invalidatedAt: nativeResumeRefsTable.invalidatedAt,
+          invalidatedSourceEventId: nativeResumeRefsTable.invalidatedSourceEventId,
           committedSessionRunId: nativeResumeRefsTable.committedSessionRunId,
           committedValue: nativeResumeRefsTable.committedValue,
           kind: nativeResumeRefsTable.kind,
@@ -74,16 +101,23 @@ export async function prepareSessionRunCompletionCheckpoint(
         .get()) ?? null;
     if (
       nativeResume === null ||
-      nativeResume.value.trim().length === 0 ||
-      nativeResume.runtimeId !== run?.runtimeId ||
-      (nativeResume.observedSessionRunId !== link.sessionRunId &&
-        (nativeResume.committedSessionRunId === null ||
-          nativeResume.value !== nativeResume.committedValue))
+      nativeResume.observedSessionRunId !== link.sessionRunId ||
+      !nativeRuntimeRefsEqual(checkpoint.nativeRef, {
+        kind: nativeResume.kind,
+        runtimeId: nativeResume.runtimeId,
+        value: nativeResume.value,
+      })
     ) {
-      throw new Error(
-        "Session completion requires a valid native resume cursor for this runtime and turn.",
-      );
+      throw terminalConflict({
+        currentStatus: run.status,
+        runId: link.sessionRunId,
+        reason: "Session completion requires this Run's observed native resume cursor.",
+      });
     }
+    await withDisposedRpcResource(
+      await getRuntimeSubjectKeepAliveHandle(bindings, link.sandboxId),
+      (sandbox) => verifyNativeCheckpointBundle(sandbox, { checkpoint, cwd: target.cwd }),
+    );
     const backup = await createRuntimeSandboxBackup(bindings, {
       dir: target.cwd,
       sandboxId: link.sandboxId,
@@ -92,6 +126,7 @@ export async function prepareSessionRunCompletionCheckpoint(
     });
     return {
       backupId: parsePlatformId<SandboxBackupId>(backup.id, "completion checkpoint id"),
+      descriptor: checkpoint,
       dir: backup.dir,
       nativeResume,
       sandboxId: link.sandboxId,
@@ -99,6 +134,7 @@ export async function prepareSessionRunCompletionCheckpoint(
       sessionRunId: link.sessionRunId,
     };
   } catch (cause) {
+    if (cause instanceof ORPCError && cause.code === "terminal_conflict") throw cause;
     throw new RuntimeSubjectCheckpointFailedError({ cause, runtimeSubjectId: link.sandboxId });
   }
 }
@@ -115,6 +151,15 @@ export function completionCheckpointSnapshotCondition(
     query.where(
       and(
         eq(nativeResumeRefsTable.sessionId, checkpoint.sessionId),
+        snapshot.committedFormatVersion === null
+          ? isNull(nativeResumeRefsTable.committedFormatVersion)
+          : eq(nativeResumeRefsTable.committedFormatVersion, snapshot.committedFormatVersion),
+        snapshot.invalidatedAt === null
+          ? isNull(nativeResumeRefsTable.invalidatedAt)
+          : eq(nativeResumeRefsTable.invalidatedAt, snapshot.invalidatedAt),
+        snapshot.invalidatedSourceEventId === null
+          ? isNull(nativeResumeRefsTable.invalidatedSourceEventId)
+          : eq(nativeResumeRefsTable.invalidatedSourceEventId, snapshot.invalidatedSourceEventId),
         eq(nativeResumeRefsTable.kind, snapshot.kind),
         eq(nativeResumeRefsTable.runtimeId, snapshot.runtimeId),
         eq(nativeResumeRefsTable.value, snapshot.value),
@@ -206,8 +251,12 @@ export function completionCheckpointWrites(
     db
       .update(nativeResumeRefsTable)
       .set({
+        committedFormatVersion: checkpoint.descriptor.formatVersion,
         committedSessionRunId: checkpoint.sessionRunId,
+        invalidatedAt: null,
+        invalidatedSourceEventId: null,
         committedValue: checkpoint.nativeResume.value,
+        updatedAt: timestampMs,
       })
       .where(
         and(

@@ -85,10 +85,28 @@ describe("session run time limit", () => {
       sessionId: PUBLIC_API_TEST_IDS.ownerSession,
       startedAt: now - 60 * 60_000,
     });
-    const bindings = createPublicHttpTestBindings(database) as ApiBindings;
+    await database
+      .prepare("UPDATE session_run SET driver_instance_id = ? WHERE id = ?")
+      .bind(PUBLIC_API_TEST_IDS.driverOwner, OVERDUE_RUN_ID)
+      .run();
+    const driverCommands: unknown[] = [];
+    const bindings = {
+      ...createPublicHttpTestBindings(database),
+      DriverConnection: {
+        get: () => ({
+          sendControlCommand: async (_driverInstanceId: string, command: unknown) => {
+            driverCommands.push(command);
+          },
+        }),
+        idFromName: (name: string) => name,
+      },
+    } as unknown as ApiBindings;
 
     await expect(stopOverdueSessionRuns(bindings, { limit: 20, nowMs: now })).resolves.toEqual([
       OVERDUE_RUN_ID,
+    ]);
+    expect(driverCommands).toEqual([
+      expect.objectContaining({ kind: "turn.cancel", runId: OVERDUE_RUN_ID }),
     ]);
 
     await expect(readRun(database, OVERDUE_RUN_ID)).resolves.toEqual({

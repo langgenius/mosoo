@@ -20,6 +20,7 @@ import type {
   MosooSessionPlanUpdatedValue,
   MosooSessionRunUpdatedValue,
   MosooSessionStoppedValue,
+  MosooSessionToolInputUpdatedValue,
   MosooSessionUsageUpdatedValue,
 } from "./custom-event-values";
 
@@ -68,6 +69,7 @@ export interface MosooCustomEventValueByName {
   [CUSTOM_EVENT_REGISTRY.sessionPlanUpdated.name]: MosooSessionPlanUpdatedValue;
   [CUSTOM_EVENT_REGISTRY.sessionRunUpdated.name]: MosooSessionRunUpdatedValue;
   [CUSTOM_EVENT_REGISTRY.sessionStopped.name]: MosooSessionStoppedValue;
+  [CUSTOM_EVENT_REGISTRY.sessionToolInputUpdated.name]: MosooSessionToolInputUpdatedValue;
   [CUSTOM_EVENT_REGISTRY.sessionUsageUpdated.name]: MosooSessionUsageUpdatedValue;
 }
 

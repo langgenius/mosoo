@@ -25,9 +25,11 @@ import type { SandboxHandle } from "../src/modules/runtime/infrastructure/sandbo
 import { isSessionTerminalCheckpointReadyForNextRun } from "../src/modules/runtime/infrastructure/session-runs/session-run-admission.repository";
 import { getSessionRunSummary } from "../src/modules/runtime/infrastructure/session-runs/session-run-read.repository";
 import { setSessionRunStatus } from "../src/modules/runtime/infrastructure/session-runs/session-run-write.repository";
+import { createSessionRuntimeEvent } from "../src/modules/sessions/application/session-event-write.service";
 import { loadSessionViewerState } from "../src/modules/sessions/application/session-live-state.service";
 import { createSessionProcessEventsFromSessionEventRows } from "../src/modules/sessions/application/session-process-events.service";
 import type { SessionEventProcessRow } from "../src/modules/sessions/application/session-process-events.service";
+import { persistSessionRuntimeEvents } from "../src/modules/sessions/infrastructure/session-runtime-event-store.repository";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
   createPublicHttpContractDatabase,
@@ -41,6 +43,15 @@ const DRIVER_ID = PUBLIC_API_TEST_IDS.driverOwner as DriverInstanceId;
 const RUN_ID = PUBLIC_API_TEST_IDS.run as SessionRunId;
 const SESSION_ID = PUBLIC_API_TEST_IDS.ownerSession as SessionId;
 const TERMINAL_SOURCE_EVENT_ID = "canary:run-completed";
+const CHECKPOINT = {
+  formatVersion: 1,
+  runId: RUN_ID,
+  nativeRef: {
+    kind: "openai_thread_id",
+    runtimeId: "openai-runtime",
+    value: "thread-durable-completion",
+  },
+} as const;
 const CANARY_LINES = Array.from({ length: 160 }, (_, index) => {
   const lineNumber = String(index + 1).padStart(3, "0");
   return `${lineNumber}|中文长文本校验-Aa${index % 10}-表格字符|END${lineNumber}`;
@@ -93,8 +104,12 @@ function runtimeEvent(input: {
     id: createPlatformId<RuntimeEventId>(),
     kind: input.kind,
     occurredAt: new Date(occurredAt).toISOString(),
-    payload: input.payload,
+    payload:
+      input.kind === "run.completed"
+        ? { checkpoint: CHECKPOINT, ...(input.payload as Record<string, unknown>) }
+        : input.payload,
     runId: RUN_ID,
+    runtimeId: "openai-runtime",
     sessionId: SESSION_ID,
     sourceEventId: input.sourceEventId,
   });
@@ -102,7 +117,7 @@ function runtimeEvent(input: {
   return {
     event,
     eventId: input.sourceEventId,
-    occurredAt,
+    occurredAt: new Date(occurredAt).toISOString(),
   };
 }
 
@@ -140,6 +155,41 @@ function messageEvents(input: {
       kind: "message.completed",
       payload: { messageId: input.messageId, role: "agent" },
       sourceEventId: `${input.sourcePrefix}:completed`,
+    }),
+  ];
+}
+
+function finalMessageEvents(input: {
+  messageId: SessionMessageId;
+  sourcePrefix: string;
+  text: string;
+}): DriverEventEnvelope[] {
+  return [
+    runtimeEvent({
+      kind: "message.added",
+      payload: { content: input.text, messageId: input.messageId, role: "agent" },
+      sourceEventId: `${input.sourcePrefix}:snapshot`,
+    }),
+    runtimeEvent({
+      kind: "message.completed",
+      payload: { messageId: input.messageId, role: "agent" },
+      sourceEventId: `${input.sourcePrefix}:completed`,
+    }),
+  ];
+}
+
+function completionEvents(text = "Done."): DriverEventEnvelope[] {
+  const finalMessageId = createPlatformId<SessionMessageId>();
+  return [
+    ...finalMessageEvents({
+      messageId: finalMessageId,
+      sourcePrefix: "completion:final",
+      text,
+    }),
+    runtimeEvent({
+      kind: "run.completed",
+      payload: { finalMessageId, stopReason: "end_turn" },
+      sourceEventId: TERMINAL_SOURCE_EVENT_ID,
     }),
   ];
 }
@@ -211,7 +261,7 @@ async function createCheckpointCompletionFixture(
     id: crypto.randomUUID(),
   }),
 ) {
-  const database = await createPublicHttpContractDatabase();
+  const database = await createPublicHttpContractDatabase({ maxBoundParams: 100 });
   await insertRuntimeFixture(database);
   database.execute(`
     UPDATE session SET kind = 'cattle', last_message_at = 1 WHERE id = '${SESSION_ID}';
@@ -234,7 +284,24 @@ async function createCheckpointCompletionFixture(
     createSession: unavailable,
     deleteSession: unavailable,
     destroy: unavailable,
-    exec: async () => ({ exitCode: 0, stderr: "", stdout: "", success: true }),
+    exec: async () => {
+      const nativeRef = await database
+        .prepare("SELECT value FROM native_resume_ref")
+        .first<{ value: string }>();
+      return {
+        exitCode: 0,
+        stderr: "",
+        stdout: JSON.stringify({
+          ...CHECKPOINT,
+          nativeRef: {
+            ...CHECKPOINT.nativeRef,
+            value: nativeRef?.value ?? CHECKPOINT.nativeRef.value,
+          },
+          files: [{ path: "thread.json", size: 2, sha256: "a".repeat(64) }],
+        }),
+        success: true,
+      };
+    },
     getSession: unavailable,
     mkdir: unavailable,
     mountBucket: unavailable,
@@ -336,6 +403,82 @@ async function pushFreshController(
 }
 
 describe("runtime final output ingestion", () => {
+  test.each([
+    undefined,
+    { ...CHECKPOINT, formatVersion: 2 },
+    { ...CHECKPOINT, runId: PUBLIC_API_TEST_IDS.runAlt },
+    {
+      ...CHECKPOINT,
+      nativeRef: {
+        kind: "claude_session_id",
+        runtimeId: "claude-agent-sdk",
+        value: "wrong-runtime",
+      },
+    },
+  ])("rejects missing or mismatched checkpoint identity before success", async (checkpoint) => {
+    let backupCalls = 0;
+    const { bindings, database } = await createCheckpointCompletionFixture(async ({ dir }) => {
+      backupCalls += 1;
+      return { dir, id: crypto.randomUUID() };
+    });
+    const finalMessageId = createPlatformId<SessionMessageId>();
+    await expect(
+      pushFreshController(bindings, [
+        ...finalMessageEvents({
+          messageId: finalMessageId,
+          sourcePrefix: "invalid-checkpoint:final",
+          text: "Done.",
+        }),
+        runtimeEvent({
+          kind: "run.completed",
+          payload: { checkpoint, finalMessageId, stopReason: "end_turn" },
+          sourceEventId: TERMINAL_SOURCE_EVENT_ID,
+        }),
+      ]),
+    ).rejects.toThrow();
+    expect((await getSessionRunSummary(database, RUN_ID))?.status).toBe("running");
+    expect(
+      await database
+        .prepare("SELECT COUNT(*) AS count FROM session_event WHERE event_type = 'run.completed'")
+        .first(),
+    ).toEqual({ count: 0 });
+    expect(backupCalls).toBe(0);
+  });
+
+  test("returns the original terminal receipt without rereading the live checkpoint bundle", async () => {
+    let backupCalls = 0;
+    const { bindings, database } = await createCheckpointCompletionFixture(async ({ dir }) => {
+      backupCalls += 1;
+      return { dir, id: crypto.randomUUID() };
+    });
+    const events = completionEvents();
+    const accepted = await pushFreshController(bindings, events);
+    const unavailableBindings = {
+      ...bindings,
+      runtimeSubjectHandleFactory: () => {
+        throw new Error("The live bundle has been removed.");
+      },
+    } as ApiBindings;
+    expect(await pushFreshController(unavailableBindings, events)).toEqual(accepted);
+    expect(backupCalls).toBe(1);
+    const changedDescriptor = [
+      {
+        ...events.at(-1)!,
+        event: {
+          ...events.at(-1)!.event,
+          payload: {
+            ...(events.at(-1)!.event.payload as Record<string, unknown>),
+            checkpoint: { ...CHECKPOINT, nativeRef: { ...CHECKPOINT.nativeRef, value: "changed" } },
+          },
+        },
+      },
+    ];
+    await expect(pushFreshController(unavailableBindings, changedDescriptor)).rejects.toMatchObject(
+      { code: "terminal_conflict" },
+    );
+    expect((await getSessionRunSummary(database, RUN_ID))?.status).toBe("completed");
+  });
+
   test("finalizes usage received before the terminal event in a separate batch", async () => {
     const { bindings, database } = await createCheckpointCompletionFixture();
     await pushFreshController(bindings, [usageEvent("usage:before-completion")]);
@@ -343,13 +486,7 @@ describe("runtime final output ingestion", () => {
       status: "started",
     });
 
-    await pushFreshController(bindings, [
-      runtimeEvent({
-        kind: "run.completed",
-        payload: { finalMessageText: "Done.", stopReason: "end_turn" },
-        sourceEventId: TERMINAL_SOURCE_EVENT_ID,
-      }),
-    ]);
+    await pushFreshController(bindings, completionEvents());
     const run = await getSessionRunSummary(database, RUN_ID);
     expect(run?.status).toBe("completed");
     expect(
@@ -381,15 +518,35 @@ describe("runtime final output ingestion", () => {
     );
   });
 
+  test("replays equivalent Unicode metadata regardless of key insertion order", async () => {
+    const { bindings } = await createCheckpointCompletionFixture();
+    const envelope = runtimeEvent({
+      kind: "message.added",
+      payload: {
+        content: "Unicode metadata replay.",
+        messageId: createPlatformId<SessionMessageId>(),
+        role: "agent",
+        metadata: { é: "composed", "e\u0301": "decomposed" },
+      },
+      sourceEventId: "unicode:metadata",
+    });
+    const accepted = await pushFreshController(bindings, [envelope]);
+    const replay = {
+      ...envelope,
+      event: {
+        ...envelope.event,
+        payload: {
+          ...(envelope.event.payload as Record<string, unknown>),
+          metadata: { "e\u0301": "decomposed", é: "composed" },
+        },
+      },
+    };
+    expect(await pushFreshController(bindings, [replay])).toEqual(accepted);
+  });
+
   test("late usage follows the persisted terminal outcome and does not duplicate the ledger", async () => {
     const { bindings, database } = await createCheckpointCompletionFixture();
-    await pushFreshController(bindings, [
-      runtimeEvent({
-        kind: "run.completed",
-        payload: { finalMessageText: "Done.", stopReason: "end_turn" },
-        sourceEventId: TERMINAL_SOURCE_EVENT_ID,
-      }),
-    ]);
+    await pushFreshController(bindings, completionEvents());
     await pushFreshController(bindings, [usageEvent("usage:late")]);
     await pushFreshController(bindings, [usageEvent("usage:late-again")]);
     const run = await getSessionRunSummary(database, RUN_ID);
@@ -412,13 +569,7 @@ describe("runtime final output ingestion", () => {
     await pushFreshController(bindings, [usageEvent("usage:before-failed-finalization")]);
     database.execute(`CREATE TRIGGER reject_usage_finalization BEFORE UPDATE ON session_model_call
       WHEN NEW.status != 'started' BEGIN SELECT RAISE(ABORT, 'injected usage finalization failure'); END;`);
-    const events = [
-      runtimeEvent({
-        kind: "run.completed",
-        payload: { finalMessageText: "Done.", stopReason: "end_turn" },
-        sourceEventId: TERMINAL_SOURCE_EVENT_ID,
-      }),
-    ];
+    const events = completionEvents();
     await expect(pushFreshController(bindings, events)).rejects.toThrow();
     expect(await database.prepare("SELECT status FROM session_run").first()).toEqual({
       status: "completed",
@@ -430,7 +581,7 @@ describe("runtime final output ingestion", () => {
       await database
         .prepare("SELECT COUNT(*) AS count FROM session_event WHERE event_type = 'run.completed'")
         .first(),
-    ).toEqual({ count: 0 });
+    ).toEqual({ count: 1 });
     database.execute("DROP TRIGGER reject_usage_finalization");
     await pushFreshController(bindings, events);
     expect(await database.prepare("SELECT status FROM session_model_call").first()).toEqual({
@@ -442,7 +593,7 @@ describe("runtime final output ingestion", () => {
     });
   });
 
-  test.each(["completed", "failed", "cancelled", "expired"] as const)(
+  test.each(["failed", "cancelled", "expired"] as const)(
     "terminal repair closes prior usage with the original %s Run outcome and time",
     async (status) => {
       const { bindings, database } = await createCheckpointCompletionFixture();
@@ -466,7 +617,7 @@ describe("runtime final output ingestion", () => {
         await database.prepare("SELECT status, completed_at FROM session_model_call").all(),
       ).toMatchObject({
         results: Array.from({ length: 2 }, () => ({
-          status: status === "completed" ? "completed" : "failed",
+          status: "failed",
           completed_at: 1800,
         })),
       });
@@ -476,16 +627,33 @@ describe("runtime final output ingestion", () => {
     },
   );
 
+  test("rejects usage repair for a completed Run without its checkpoint receipt", async () => {
+    const { bindings, database } = await createCheckpointCompletionFixture();
+    await pushFreshController(bindings, [usageEvent("usage:unverified-completion")]);
+    database.execute(
+      "UPDATE session_run SET status = 'completed', completed_at = 1800, updated_at = 1800",
+    );
+    const run = await getSessionRunSummary(database, RUN_ID);
+    if (run === null) throw new Error("Fixture Run missing");
+    await expect(
+      repairTerminalSessionRunProjections(bindings, {
+        preserveSessionLifecycle: true,
+        run,
+        sessionId: SESSION_ID,
+      }),
+    ).rejects.toThrow("requires its committed checkpoint");
+    expect(
+      await database.prepare("SELECT status, completed_at FROM session_model_call").first(),
+    ).toEqual({ status: "started", completed_at: null });
+    expect(await database.prepare("SELECT COUNT(*) AS count FROM usage_event").first()).toEqual({
+      count: 1,
+    });
+  });
+
   test("maintenance repairs unfinished usage even when the terminal history already exists", async () => {
     const { bindings, database } = await createCheckpointCompletionFixture();
     await pushFreshController(bindings, [usageEvent("usage:old-version")]);
-    await pushFreshController(bindings, [
-      runtimeEvent({
-        kind: "run.completed",
-        payload: { finalMessageText: "Done.", stopReason: "end_turn" },
-        sourceEventId: TERMINAL_SOURCE_EVENT_ID,
-      }),
-    ]);
+    await pushFreshController(bindings, completionEvents());
     const originalRun = await getSessionRunSummary(database, RUN_ID);
     database.execute(`UPDATE session_model_call SET status = 'started', completed_at = NULL;
       UPDATE driver_instance SET status = 'stopped';`);
@@ -529,15 +697,7 @@ describe("runtime final output ingestion", () => {
       ]);
       const completion = pushFreshController(bindings, [
         usageEvent("usage:co-batched"),
-        runtimeEvent({
-          kind: "run.completed",
-          payload: {
-            finalMessageId: createPlatformId<SessionMessageId>(),
-            finalMessageText: "The report is ready.",
-            stopReason: "end_turn",
-          },
-          sourceEventId: TERMINAL_SOURCE_EVENT_ID,
-        }),
+        ...completionEvents("The report is ready."),
       ]);
 
       await started.promise;
@@ -566,6 +726,131 @@ describe("runtime final output ingestion", () => {
     },
   );
 
+  test.each(["completion", "file update"] as const)(
+    "keeps a delayed %s visible after an SSE cursor observes the other writer",
+    async (delayedWriter) => {
+      const paused = Promise.withResolvers<void>();
+      const resume = Promise.withResolvers<void>();
+      const { bindings, database } = await createCheckpointCompletionFixture(async ({ dir }) => {
+        if (delayedWriter === "completion") {
+          paused.resolve();
+          await resume.promise;
+        }
+        return { dir, id: crypto.randomUUID() };
+      });
+      const fileDatabase =
+        delayedWriter === "file update"
+          ? new Proxy(database, {
+              get(target, property) {
+                if (property === "batch") {
+                  return async (statements: D1PreparedStatement[]) => {
+                    paused.resolve();
+                    await resume.promise;
+                    return target.batch(statements);
+                  };
+                }
+                const value = Reflect.get(target, property);
+                return typeof value === "function" ? value.bind(target) : value;
+              },
+            })
+          : database;
+      const fileSourceEventId = "concurrent:file-update";
+      const fileEvent = createSessionRuntimeEvent({
+        kind: "session.files.updated",
+        origin: "file",
+        payload: { change: { change: "delete", fileId: PUBLIC_API_TEST_IDS.file } },
+        sessionId: SESSION_ID,
+        sourceEventId: fileSourceEventId,
+      });
+      const writeFileEvent = () =>
+        persistSessionRuntimeEvents(fileDatabase, {
+          records: [
+            {
+              event: fileEvent,
+              occurredAt: Date.parse(fileEvent.occurredAt),
+              sourceEventId: fileSourceEventId,
+            },
+          ],
+          sessionId: SESSION_ID,
+        });
+      const completeRun = () => pushFreshController(bindings, completionEvents());
+      const readAfterCursor = async (cursor: number) => {
+        const result = await database
+          .prepare(`
+          SELECT event_type, seq, source_event_id FROM session_event
+          WHERE session_id = ? AND visibility = 'all_consumers' AND seq > ?
+          ORDER BY seq ASC
+        `)
+          .bind(SESSION_ID, cursor)
+          .all<{ event_type: string; seq: number; source_event_id: string }>();
+        return result.results;
+      };
+      const delayed = delayedWriter === "completion" ? completeRun() : writeFileEvent();
+      await paused.promise;
+      let seenCursor = 0;
+      try {
+        await (delayedWriter === "completion" ? writeFileEvent() : completeRun());
+        const visible = await readAfterCursor(0);
+        const lastSeen = visible.at(-1);
+        expect(lastSeen?.source_event_id).toBe(
+          delayedWriter === "completion" ? fileSourceEventId : TERMINAL_SOURCE_EVENT_ID,
+        );
+        seenCursor = lastSeen!.seq;
+      } finally {
+        resume.resolve();
+        await delayed;
+      }
+
+      const later = await readAfterCursor(seenCursor);
+      expect(later.map((row) => row.source_event_id)).toEqual([
+        delayedWriter === "completion" ? TERMINAL_SOURCE_EVENT_ID : fileSourceEventId,
+      ]);
+      expect(later[0]?.seq).toBeGreaterThan(seenCursor);
+    },
+  );
+
+  test("archiving a Session during checkpoint creation prevents completion from committing", async () => {
+    const paused = Promise.withResolvers<void>();
+    const resume = Promise.withResolvers<void>();
+    const { bindings, database, deletedBackupKeys } = await createCheckpointCompletionFixture(
+      async ({ dir }) => {
+        paused.resolve();
+        await resume.promise;
+        return { dir, id: crypto.randomUUID() };
+      },
+    );
+    const completion = pushFreshController(bindings, completionEvents());
+    await paused.promise;
+    try {
+      await database
+        .prepare("UPDATE session SET archived_at = ? WHERE id = ?")
+        .bind(Date.now(), SESSION_ID)
+        .run();
+    } finally {
+      resume.resolve();
+      await expect(completion).rejects.toMatchObject({ code: "terminal_conflict" });
+    }
+
+    expect((await getSessionRunSummary(database, RUN_ID))?.status).toBe("running");
+    expect(
+      await database
+        .prepare("SELECT COUNT(*) AS count FROM session_event WHERE event_type = 'run.completed'")
+        .first(),
+    ).toEqual({ count: 0 });
+    expect(await database.prepare("SELECT COUNT(*) AS count FROM session_message").first()).toEqual(
+      { count: 0 },
+    );
+    expect(await database.prepare("SELECT COUNT(*) AS count FROM sandbox_backup").first()).toEqual({
+      count: 0,
+    });
+    expect(
+      await database
+        .prepare("SELECT committed_session_run_id, committed_value FROM native_resume_ref")
+        .first(),
+    ).toEqual({ committed_session_run_id: null, committed_value: null });
+    expect(deletedBackupKeys).toHaveLength(2);
+  });
+
   test("a cancellation during checkpoint creation cannot publish a successful result or resume cursor", async () => {
     const started = Promise.withResolvers<void>();
     const backup = Promise.withResolvers<{ dir: string; id: string }>();
@@ -577,15 +862,7 @@ describe("runtime final output ingestion", () => {
     );
     const completion = pushFreshController(bindings, [
       usageEvent("usage:cancel-race"),
-      runtimeEvent({
-        kind: "run.completed",
-        payload: {
-          finalMessageId: createPlatformId<SessionMessageId>(),
-          finalMessageText: FINAL_TEXT,
-          stopReason: "end_turn",
-        },
-        sourceEventId: TERMINAL_SOURCE_EVENT_ID,
-      }),
+      ...completionEvents(FINAL_TEXT),
     ]);
     await started.promise;
     try {
@@ -595,11 +872,11 @@ describe("runtime final output ingestion", () => {
         dir: `/workspace/se/${SESSION_ID}`,
         id: "550e8400-e29b-41d4-a716-446655440002",
       });
-      await completion;
+      await expect(completion).rejects.toMatchObject({ code: "terminal_conflict" });
     }
     expect((await getSessionRunSummary(database, RUN_ID))?.status).toBe("cancelled");
     expect(await database.prepare("SELECT status FROM session_model_call").first()).toEqual({
-      status: "failed",
+      status: "started",
     });
     await expect(
       readPublicThreadRunFinalOutput({ database, runId: RUN_ID, sessionId: SESSION_ID }),
@@ -641,17 +918,7 @@ describe("runtime final output ingestion", () => {
           BEGIN SELECT RAISE(ABORT, 'injected native cursor commit failure'); END;
         `);
       }
-      const events = [
-        runtimeEvent({
-          kind: "run.completed",
-          payload: {
-            finalMessageId: createPlatformId<SessionMessageId>(),
-            finalMessageText: FINAL_TEXT,
-            stopReason: "end_turn",
-          },
-          sourceEventId: TERMINAL_SOURCE_EVENT_ID,
-        }),
-      ];
+      const events = completionEvents(FINAL_TEXT);
       await expect(pushFreshController(bindings, events)).rejects.toBeInstanceOf(Error);
       expect((await getSessionRunSummary(database, RUN_ID))?.status).toBe("running");
       await expect(
@@ -700,20 +967,10 @@ describe("runtime final output ingestion", () => {
         return { dir: options.dir, id: crypto.randomUUID() };
       },
     );
-    const events = [
-      runtimeEvent({
-        kind: "run.completed",
-        payload: {
-          finalMessageId: createPlatformId<SessionMessageId>(),
-          finalMessageText: FINAL_TEXT,
-          stopReason: "end_turn",
-        },
-        sourceEventId: TERMINAL_SOURCE_EVENT_ID,
-      }),
-    ];
-    await expect(pushFreshController(bindings, events)).rejects.toThrow(
-      "lost a concurrent run transition",
-    );
+    const events = completionEvents(FINAL_TEXT);
+    await expect(pushFreshController(bindings, events)).rejects.toMatchObject({
+      code: "terminal_conflict",
+    });
     expect((await getSessionRunSummary(database, RUN_ID))?.status).toBe("running");
     await expect(
       database
@@ -727,31 +984,41 @@ describe("runtime final output ingestion", () => {
     expect(deletedBackupKeys).toHaveLength(2);
 
     changeCursor = false;
-    await pushFreshController(bindings, events);
+    const retryEvents = [
+      runtimeEvent({
+        kind: "run.completed",
+        sourceEventId: TERMINAL_SOURCE_EVENT_ID,
+        payload: {
+          ...(events.at(-1)!.event.payload as Record<string, unknown>),
+          checkpoint: {
+            ...CHECKPOINT,
+            nativeRef: { ...CHECKPOINT.nativeRef, value: "thread-updated" },
+          },
+        },
+      }),
+    ];
+    await pushFreshController(bindings, retryEvents);
     expect((await getSessionRunSummary(database, RUN_ID))?.status).toBe("completed");
     await expect(
       database.prepare("SELECT committed_value FROM native_resume_ref").first(),
     ).resolves.toEqual({ committed_value: "thread-updated" });
   });
 
-  test("the terminal RPC also waits for a checkpoint before declaring success", async () => {
-    let backupAvailable = false;
-    const { bindings, database } = await createCheckpointCompletionFixture(async (options) => {
-      if (!backupAvailable) {
-        throw new Error("backup service unavailable");
-      }
-      return { dir: options.dir, id: crypto.randomUUID() };
+  test("the terminal RPC requires a committed canonical completion", async () => {
+    let backupCalls = 0;
+    const { bindings, database } = await createCheckpointCompletionFixture(async ({ dir }) => {
+      backupCalls += 1;
+      return { dir, id: crypto.randomUUID() };
     });
     await expect(
-      recordDriverInstanceCompletion(bindings, { driverInstanceId: DRIVER_ID }),
-    ).rejects.toBeInstanceOf(Error);
+      recordDriverInstanceCompletion(bindings, { driverInstanceId: DRIVER_ID, runId: RUN_ID }),
+    ).rejects.toMatchObject({ code: "terminal_conflict" });
     expect((await getSessionRunSummary(database, RUN_ID))?.status).toBe("running");
-    backupAvailable = true;
-    await recordDriverInstanceCompletion(bindings, { driverInstanceId: DRIVER_ID });
+    expect(backupCalls).toBe(0);
+    await pushFreshController(bindings, completionEvents());
+    await recordDriverInstanceCompletion(bindings, { driverInstanceId: DRIVER_ID, runId: RUN_ID });
     expect((await getSessionRunSummary(database, RUN_ID))?.status).toBe("completed");
-    await expect(
-      database.prepare("SELECT committed_value FROM native_resume_ref").first(),
-    ).resolves.toEqual({ committed_value: "thread-durable-completion" });
+    expect(backupCalls).toBe(1);
   });
 
   test.each(["missing", "uncommitted previous turn", "different runtime"] as const)(
@@ -771,24 +1038,24 @@ describe("runtime final output ingestion", () => {
           "UPDATE native_resume_ref SET runtime_id = 'claude-agent-sdk', kind = 'claude_session_id'",
         );
       }
-      await expect(
-        recordDriverInstanceCompletion(bindings, { driverInstanceId: DRIVER_ID }),
-      ).rejects.toThrow("checkpoint failed");
+      await expect(pushFreshController(bindings, completionEvents())).rejects.toMatchObject({
+        code: "terminal_conflict",
+      });
       expect((await getSessionRunSummary(database, RUN_ID))?.status).toBe("running");
       expect(backupCalls).toBe(0);
     },
   );
 
-  test("commits a stable cursor already saved by a previous successful turn", async () => {
+  test("commits a stable cursor re-observed by the current turn", async () => {
     const { bindings, database } = await createCheckpointCompletionFixture(async (options) => ({
       dir: options.dir,
       id: crypto.randomUUID(),
     }));
     const previousRunId = createPlatformId<SessionRunId>();
     database.execute(
-      `UPDATE native_resume_ref SET observed_session_run_id = '${previousRunId}', committed_session_run_id = '${previousRunId}', committed_value = value`,
+      `UPDATE native_resume_ref SET committed_session_run_id = '${previousRunId}', committed_value = value`,
     );
-    await recordDriverInstanceCompletion(bindings, { driverInstanceId: DRIVER_ID });
+    await pushFreshController(bindings, completionEvents());
     await expect(
       database
         .prepare("SELECT committed_session_run_id, committed_value FROM native_resume_ref")
@@ -800,7 +1067,7 @@ describe("runtime final output ingestion", () => {
   });
 
   test.each(["assistant", "terminal event"] as const)(
-    "blocks follow-up after %s persistence fails and replays without another checkpoint",
+    "rolls back completion after %s persistence fails and retries the checkpoint",
     async (failure) => {
       let backupCalls = 0;
       const { bindings, database } = await createCheckpointCompletionFixture(async (options) => {
@@ -818,25 +1085,23 @@ describe("runtime final output ingestion", () => {
         BEGIN SELECT RAISE(ABORT, 'injected terminal history persistence failure'); END;
       `,
       );
-      const events = [
-        runtimeEvent({
-          kind: "run.completed",
-          payload: {
-            finalMessageId: createPlatformId<SessionMessageId>(),
-            finalMessageText: FINAL_TEXT,
-            stopReason: "end_turn",
-          },
-          sourceEventId: TERMINAL_SOURCE_EVENT_ID,
-        }),
-      ];
+      const events = completionEvents(FINAL_TEXT);
       await expect(pushFreshController(bindings, events)).rejects.toBeInstanceOf(Error);
-      await expect(isSessionTerminalCheckpointReadyForNextRun(database, SESSION_ID)).resolves.toBe(
-        false,
-      );
-      await recordDriverInstanceCompletion(bindings, { driverInstanceId: DRIVER_ID });
-      await expect(isSessionTerminalCheckpointReadyForNextRun(database, SESSION_ID)).resolves.toBe(
-        false,
-      );
+      await expect(
+        recordDriverInstanceCompletion(bindings, { driverInstanceId: DRIVER_ID, runId: RUN_ID }),
+      ).rejects.toMatchObject({ code: "terminal_conflict" });
+      expect((await getSessionRunSummary(database, RUN_ID))?.status).toBe("running");
+      expect(
+        await database
+          .prepare("SELECT committed_session_run_id, committed_value FROM native_resume_ref")
+          .first(),
+      ).toEqual({ committed_session_run_id: null, committed_value: null });
+      expect(
+        await database.prepare("SELECT COUNT(*) AS count FROM sandbox_backup").first(),
+      ).toEqual({ count: 0 });
+      expect(
+        await database.prepare("SELECT COUNT(*) AS count FROM session_message").first(),
+      ).toEqual({ count: 0 });
       database.execute("DROP TRIGGER reject_final_output");
       await pushFreshController(bindings, events);
       await expect(isSessionTerminalCheckpointReadyForNextRun(database, SESSION_ID)).resolves.toBe(
@@ -845,7 +1110,7 @@ describe("runtime final output ingestion", () => {
       await expect(
         readPublicThreadRunFinalOutput({ database, runId: RUN_ID, sessionId: SESSION_ID }),
       ).resolves.toEqual({ text: FINAL_TEXT });
-      expect(backupCalls).toBe(1);
+      expect(backupCalls).toBe(2);
     },
   );
 
@@ -853,7 +1118,7 @@ describe("runtime final output ingestion", () => {
     ["omits", false],
     ["provides", true],
   ] as const)(
-    "persists one final assistant snapshot when the driver %s it",
+    "requires a durable final snapshot when the driver %s it",
     async (_driverBehavior, driverProvidesSnapshot) => {
       const { bindings: fixtureBindings, database } = await createCheckpointCompletionFixture();
       const capturedEvents: unknown[] = [];
@@ -878,25 +1143,33 @@ describe("runtime final output ingestion", () => {
           }),
         ),
         ...(driverProvidesSnapshot
-          ? [
-              runtimeEvent({
-                kind: "message.added",
-                payload: { content: finalText, messageId: finalMessageId, role: "agent" },
-                sourceEventId: "fractured:final-snapshot",
-              }),
-            ]
+          ? finalMessageEvents({
+              messageId: finalMessageId,
+              sourcePrefix: "fractured:final",
+              text: finalText,
+            })
           : []),
         runtimeEvent({
           kind: "run.completed",
           payload: {
             finalMessageId,
-            finalMessageText: finalText,
             stopReason: "end_turn",
           },
           sourceEventId: "fractured:run-completed",
         }),
       ];
 
+      if (!driverProvidesSnapshot) {
+        await expect(pushFreshController(bindings, events)).rejects.toMatchObject({
+          code: "terminal_conflict",
+        });
+        expect((await getSessionRunSummary(database, RUN_ID))?.status).toBe("running");
+        expect(
+          await database.prepare("SELECT COUNT(*) AS count FROM session_message").first(),
+        ).toEqual({ count: 0 });
+        expect(capturedEvents).toEqual([]);
+        return;
+      }
       await pushFreshController(bindings, events);
 
       const rows = await database
@@ -932,6 +1205,64 @@ describe("runtime final output ingestion", () => {
       ]);
     },
   );
+
+  test("replaces a streamed draft with the latest chunked final snapshot", async () => {
+    const { bindings, database } = await createCheckpointCompletionFixture();
+    const finalMessageId = createPlatformId<SessionMessageId>();
+    await pushFreshController(
+      bindings,
+      messageEvents({
+        messageId: finalMessageId,
+        sourcePrefix: "snapshot-replacement:stream",
+        text: "An earlier complete draft.",
+      }),
+    );
+    const chunks = ["The final ", "answer differs."];
+    const finalText = chunks.join("");
+    await pushFreshController(bindings, [
+      runtimeEvent({
+        kind: "message.added",
+        payload: { content: chunks[0], messageId: finalMessageId, role: "agent" },
+        sourceEventId: "snapshot-replacement:added",
+      }),
+      runtimeEvent({
+        kind: "message.delta",
+        payload: { contentDelta: chunks[1], messageId: finalMessageId, role: "agent" },
+        sourceEventId: "snapshot-replacement:delta",
+      }),
+      runtimeEvent({
+        kind: "message.completed",
+        payload: { messageId: finalMessageId, role: "agent" },
+        sourceEventId: "snapshot-replacement:completed",
+      }),
+    ]);
+    await pushFreshController(bindings, [
+      runtimeEvent({
+        kind: "run.completed",
+        payload: { finalMessageId, stopReason: "end_turn" },
+        sourceEventId: TERMINAL_SOURCE_EVENT_ID,
+      }),
+    ]);
+
+    expect(
+      await database
+        .prepare("SELECT content_text FROM session_message WHERE id = ?")
+        .bind(finalMessageId)
+        .first(),
+    ).toEqual({ content_text: finalText });
+    await expect(
+      readPublicThreadRunFinalOutput({ database, runId: RUN_ID, sessionId: SESSION_ID }),
+    ).resolves.toEqual({ text: finalText });
+    const transcript = await loadSessionViewerState(database, {
+      sessionId: SESSION_ID,
+      viewerId: PUBLIC_API_TEST_IDS.ownerAccount,
+    });
+    expect(
+      transcript.messages
+        .filter((message) => message.id === finalMessageId)
+        .map(({ content, segments }) => ({ content, segments })),
+    ).toEqual([{ content: finalText, segments: [{ kind: "text", text: finalText }] }]);
+  });
 
   test("preserves a long final snapshot across hibernation, terminal failure, and replay", async () => {
     const { bindings, database } = await createCheckpointCompletionFixture();
@@ -987,15 +1318,15 @@ describe("runtime final output ingestion", () => {
     );
     const finalStreamEvents = [
       runtimeEvent({
-        kind: "message.started",
-        payload: { messageId: finalMessageId, role: "agent" },
-        sourceEventId: "canary:final:started",
+        kind: "message.added",
+        payload: { content: finalTextChunks[0], messageId: finalMessageId, role: "agent" },
+        sourceEventId: "canary:final:snapshot",
       }),
-      ...finalTextChunks.map((contentDelta, index) =>
+      ...finalTextChunks.slice(1).map((contentDelta, index) =>
         runtimeEvent({
           kind: "message.delta",
           payload: { contentDelta, messageId: finalMessageId, role: "agent" },
-          sourceEventId: `canary:final:delta:${index + 1}`,
+          sourceEventId: `canary:final:delta:${index + 2}`,
         }),
       ),
     ];
@@ -1016,7 +1347,6 @@ describe("runtime final output ingestion", () => {
         kind: "run.completed",
         payload: {
           finalMessageId,
-          finalMessageText: FINAL_TEXT,
           stopReason: "end_turn",
         },
         sourceEventId: TERMINAL_SOURCE_EVENT_ID,
@@ -1047,40 +1377,14 @@ describe("runtime final output ingestion", () => {
       .bind(TERMINAL_SOURCE_EVENT_ID)
       .all<{ source_event_id: string }>();
 
-    expect(completedRun?.status).toBe("completed");
-    expect(projectedMessagesBeforeReplay.results).toEqual([
-      { content_text: FINAL_TEXT, id: finalMessageId },
-    ]);
-    expect(finalOutputBeforeReplay?.text).toBe(FINAL_TEXT);
-    expect(new TextEncoder().encode(finalOutputBeforeReplay?.text)).toEqual(
-      new TextEncoder().encode(FINAL_TEXT),
-    );
+    expect(completedRun?.status).toBe("running");
+    expect(projectedMessagesBeforeReplay.results).toEqual([]);
+    expect(finalOutputBeforeReplay).toBeNull();
     expect(terminalRowsBeforeReplay.results).toEqual([]);
 
-    const replayedFinalMessageId = createPlatformId<SessionMessageId>();
-    const crossBootTerminalBatch = [
-      ...messageEvents({
-        messageId: replayedFinalMessageId,
-        sourcePrefix: "canary:reconnected-final",
-        text: FINAL_TEXT,
-      }),
-      runtimeEvent({
-        kind: "run.completed",
-        payload: {
-          finalMessageId: replayedFinalMessageId,
-          finalMessageText: FINAL_TEXT,
-          stopReason: "end_turn",
-        },
-        sourceEventId: TERMINAL_SOURCE_EVENT_ID,
-      }),
-    ];
-
-    expect(await pushFreshController(bindings, crossBootTerminalBatch)).toHaveLength(
-      crossBootTerminalBatch.length,
-    );
-    expect(await pushFreshController(bindings, crossBootTerminalBatch)).toHaveLength(
-      crossBootTerminalBatch.length,
-    );
+    const accepted = await pushFreshController(bindings, terminalBatch);
+    expect(accepted).toHaveLength(terminalBatch.length);
+    expect(await pushFreshController(bindings, terminalBatch)).toEqual(accepted);
 
     const projectedMessagesAfterReplay = await database
       .prepare("SELECT content_text, id FROM session_message WHERE session_run_id = ? ORDER BY seq")
@@ -1101,7 +1405,9 @@ describe("runtime final output ingestion", () => {
       (message) => message.role === "assistant" && message.content === FINAL_TEXT,
     );
 
-    expect(projectedMessagesAfterReplay.results).toEqual(projectedMessagesBeforeReplay.results);
+    expect(projectedMessagesAfterReplay.results).toEqual([
+      { content_text: FINAL_TEXT, id: finalMessageId },
+    ]);
     expect(terminalRowsAfterReplay.results).toEqual([
       { source_event_id: TERMINAL_SOURCE_EVENT_ID },
     ]);
@@ -1117,7 +1423,7 @@ describe("runtime final output ingestion", () => {
     const privateCitation = "\uE200cite\uE202turn2view0\uE202turn8view0\uE201";
     const providerText = `before${privateCitation}after`;
     const events = [
-      ...messageEvents({
+      ...finalMessageEvents({
         messageId: finalMessageId,
         sourcePrefix: "private-citation:final",
         text: providerText,
@@ -1126,7 +1432,6 @@ describe("runtime final output ingestion", () => {
         kind: "run.completed",
         payload: {
           finalMessageId,
-          finalMessageText: providerText,
           stopReason: "end_turn",
         },
         sourceEventId: "private-citation:run-completed",
@@ -1161,20 +1466,20 @@ describe("runtime final output ingestion", () => {
     const events = [
       runtimeEvent({
         kind: "thought.started",
-        payload: { messageId: finalMessageId },
+        payload: { thoughtId: "private-reasoning" },
         sourceEventId: "reasoning:started",
       }),
       runtimeEvent({
         kind: "thought.delta",
-        payload: { contentDelta: privateReasoningText, messageId: finalMessageId },
+        payload: { contentDelta: privateReasoningText, thoughtId: "private-reasoning" },
         sourceEventId: "reasoning:delta",
       }),
       runtimeEvent({
         kind: "thought.completed",
-        payload: { messageId: finalMessageId },
+        payload: { thoughtId: "private-reasoning" },
         sourceEventId: "reasoning:completed",
       }),
-      ...messageEvents({
+      ...finalMessageEvents({
         messageId: finalMessageId,
         sourcePrefix: "reasoning:final",
         text: FINAL_TEXT,
@@ -1183,7 +1488,6 @@ describe("runtime final output ingestion", () => {
         kind: "run.completed",
         payload: {
           finalMessageId,
-          finalMessageText: FINAL_TEXT,
           stopReason: "end_turn",
         },
         sourceEventId: "reasoning:run-completed",
@@ -1208,7 +1512,7 @@ describe("runtime final output ingestion", () => {
     const { bindings, database } = await createCheckpointCompletionFixture();
     const finalMessageId = createPlatformId<SessionMessageId>();
     const terminalBatch = [
-      ...messageEvents({
+      ...finalMessageEvents({
         messageId: finalMessageId,
         sourcePrefix: "conflict:original-final",
         text: FINAL_TEXT,
@@ -1217,23 +1521,17 @@ describe("runtime final output ingestion", () => {
         kind: "run.completed",
         payload: {
           finalMessageId,
-          finalMessageText: FINAL_TEXT,
           stopReason: "end_turn",
         },
         sourceEventId: TERMINAL_SOURCE_EVENT_ID,
       }),
     ];
-    const failingBindings = {
-      ...bindings,
-      DB: failTerminalSessionEventInsert(database),
-    } as ApiBindings;
-
-    await expect(pushFreshController(failingBindings, terminalBatch)).rejects.toBeInstanceOf(Error);
+    await pushFreshController(bindings, terminalBatch);
 
     const replayedFinalMessageId = createPlatformId<SessionMessageId>();
     const conflictingText = `${FINAL_TEXT}\nCONFLICTING-REPLAY`;
     const conflictingReplay = [
-      ...messageEvents({
+      ...finalMessageEvents({
         messageId: replayedFinalMessageId,
         sourcePrefix: "conflict:reconnected-final",
         text: conflictingText,
@@ -1242,7 +1540,6 @@ describe("runtime final output ingestion", () => {
         kind: "run.completed",
         payload: {
           finalMessageId: replayedFinalMessageId,
-          finalMessageText: conflictingText,
           stopReason: "end_turn",
         },
         sourceEventId: TERMINAL_SOURCE_EVENT_ID,
@@ -1250,7 +1547,7 @@ describe("runtime final output ingestion", () => {
     ];
 
     await expect(pushFreshController(bindings, conflictingReplay)).rejects.toThrow(
-      "Canonical final assistant message conflicts with the persisted projection",
+      "Source event identity already belongs to a different runtime event",
     );
 
     const messages = await database
@@ -1263,7 +1560,7 @@ describe("runtime final output ingestion", () => {
       .all<{ source_event_id: string }>();
 
     expect(messages.results).toEqual([{ content_text: FINAL_TEXT, id: finalMessageId }]);
-    expect(terminalRows.results).toEqual([]);
+    expect(terminalRows.results).toEqual([{ source_event_id: TERMINAL_SOURCE_EVENT_ID }]);
     await expect(
       readPublicThreadRunFinalOutput({ database, runId: RUN_ID, sessionId: SESSION_ID }),
     ).resolves.toEqual({ text: FINAL_TEXT });
@@ -1279,7 +1576,9 @@ describe("runtime final output ingestion", () => {
     });
 
     await pushFreshController(bindings, progressEvents);
-    await recordDriverInstanceCompletion(bindings, { driverInstanceId: DRIVER_ID });
+    await expect(
+      recordDriverInstanceCompletion(bindings, { driverInstanceId: DRIVER_ID, runId: RUN_ID }),
+    ).rejects.toMatchObject({ code: "terminal_conflict" });
 
     const finalOutput = await readPublicThreadRunFinalOutput({
       database,
@@ -1295,35 +1594,88 @@ describe("runtime final output ingestion", () => {
     expect(messages.results).toEqual([]);
   });
 
-  test("fails closed when run completion omits the final text snapshot", async () => {
-    const { bindings, database } = await createCheckpointCompletionFixture();
-    const progressMessageId = createPlatformId<SessionMessageId>();
-    const events = [
-      ...messageEvents({
-        messageId: progressMessageId,
-        sourcePrefix: "missing-snapshot:progress",
-        text: PROGRESS_TEXTS[0],
-      }),
-      runtimeEvent({
-        kind: "run.completed",
-        payload: { finalMessageId: progressMessageId, stopReason: "end_turn" },
-        sourceEventId: "missing-snapshot:run-completed",
-      }),
-    ];
+  test.each(["different Run", "missing completion marker"] as const)(
+    "rejects a final snapshot with %s",
+    async (invalidSnapshot) => {
+      const { bindings, database } = await createCheckpointCompletionFixture();
+      const events = completionEvents(FINAL_TEXT);
+      await pushFreshController(
+        bindings,
+        invalidSnapshot === "different Run" ? events.slice(0, -1) : events.slice(0, 1),
+      );
+      if (invalidSnapshot === "different Run") {
+        database.execute(
+          `UPDATE session_event SET run_id = '${PUBLIC_API_TEST_IDS.runAlt}' WHERE run_id = '${RUN_ID}'`,
+        );
+      }
+      await expect(pushFreshController(bindings, [events.at(-1)!])).rejects.toMatchObject({
+        code: "terminal_conflict",
+      });
+      expect((await getSessionRunSummary(database, RUN_ID))?.status).toBe("running");
+      expect(
+        await database.prepare("SELECT COUNT(*) AS count FROM session_message").first(),
+      ).toEqual({ count: 0 });
+      expect(
+        await database
+          .prepare("SELECT COUNT(*) AS count FROM session_event WHERE event_type = 'run.completed'")
+          .first(),
+      ).toEqual({ count: 0 });
+    },
+  );
 
-    await pushFreshController(bindings, events);
+  test.each(["snapshot", "identity"] as const)(
+    "does not infer final output when the final message %s is absent",
+    async (missing) => {
+      const { bindings, database } = await createCheckpointCompletionFixture();
+      const progressMessageId = createPlatformId<SessionMessageId>();
+      const events = [
+        ...(missing === "snapshot" ? messageEvents : finalMessageEvents)({
+          messageId: progressMessageId,
+          sourcePrefix: "missing-snapshot:progress",
+          text: PROGRESS_TEXTS[0],
+        }),
+        runtimeEvent({
+          kind: "run.completed",
+          payload: {
+            ...(missing === "identity" ? {} : { finalMessageId: progressMessageId }),
+            stopReason: "end_turn",
+          },
+          sourceEventId: "missing-snapshot:run-completed",
+        }),
+      ];
 
-    await expect(
-      readPublicThreadRunFinalOutput({ database, runId: RUN_ID, sessionId: SESSION_ID }),
-    ).resolves.toBeNull();
-  });
+      if (missing === "snapshot") {
+        await expect(pushFreshController(bindings, events)).rejects.toMatchObject({
+          code: "terminal_conflict",
+        });
+        expect((await getSessionRunSummary(database, RUN_ID))?.status).toBe("running");
+        expect(
+          await database
+            .prepare(
+              "SELECT COUNT(*) AS count FROM session_event WHERE event_type = 'run.completed'",
+            )
+            .first(),
+        ).toEqual({ count: 0 });
+      } else {
+        await pushFreshController(bindings, events);
+        expect((await getSessionRunSummary(database, RUN_ID))?.status).toBe("completed");
+      }
+      expect(
+        await database.prepare("SELECT COUNT(*) AS count FROM session_message").first(),
+      ).toEqual({ count: 0 });
+
+      await expect(
+        readPublicThreadRunFinalOutput({ database, runId: RUN_ID, sessionId: SESSION_ID }),
+      ).resolves.toBeNull();
+    },
+  );
 
   test("does not persist canonical output after another terminal status wins", async () => {
     const { bindings, database } = await createCheckpointCompletionFixture();
     database.execute(`UPDATE session_run SET status = 'failed' WHERE id = '${RUN_ID}'`);
     const finalMessageId = createPlatformId<SessionMessageId>();
     const events = [
-      ...messageEvents({
+      ...finalMessageEvents({
         messageId: finalMessageId,
         sourcePrefix: "stale-completion:final",
         text: FINAL_TEXT,
@@ -1332,14 +1684,15 @@ describe("runtime final output ingestion", () => {
         kind: "run.completed",
         payload: {
           finalMessageId,
-          finalMessageText: FINAL_TEXT,
           stopReason: "end_turn",
         },
         sourceEventId: "stale-completion:run-completed",
       }),
     ];
 
-    await pushFreshController(bindings, events);
+    await expect(pushFreshController(bindings, events)).rejects.toMatchObject({
+      code: "terminal_conflict",
+    });
 
     const run = await database
       .prepare("SELECT status FROM session_run WHERE id = ?")

@@ -141,7 +141,11 @@ class PublicLiveEventRowProjector {
         continue;
       }
 
-      if (row.event_type === "message.completed") {
+      if (
+        row.event_type === "message.completed" ||
+        row.event_type === "message.cancelled" ||
+        row.event_type === "message.failed"
+      ) {
         const message = this.#messages.get(key);
         const contentText = message?.filter.finish().text ?? "";
 
@@ -174,7 +178,11 @@ class PublicLiveEventRowProjector {
         }
       }
 
-      if (row.event_type === "thought.started" || row.event_type === "thought.completed") {
+      if (
+        row.event_type === "thought.started" ||
+        row.event_type === "thought.completed" ||
+        row.event_type === "thought.cancelled"
+      ) {
         continue;
       }
 

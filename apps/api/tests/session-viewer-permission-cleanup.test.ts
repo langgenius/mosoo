@@ -195,6 +195,7 @@ describe("viewer permission cleanup alarm", () => {
         decision: "reject_once",
         kind: "permission.resolve",
         requestId: "permission-1",
+        runId: PUBLIC_API_TEST_IDS.run,
       }),
     ]);
     expect(

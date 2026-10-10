@@ -84,6 +84,11 @@ export interface MosooSessionUsageUpdatedValue {
   usage: SessionUsageSummary | null;
 }
 
+export interface MosooSessionToolInputUpdatedValue {
+  rawInput: string;
+  toolCallId: string;
+}
+
 export interface MosooSessionInfoUpdatedValue {
   title?: string | null;
   updatedAt?: string | null;

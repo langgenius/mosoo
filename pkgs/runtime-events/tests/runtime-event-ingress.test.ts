@@ -18,7 +18,7 @@ function envelope(input: Record<string, unknown>): Record<string, unknown> {
     occurredAt: OCCURRED_AT,
     origin: "driver",
     runId: PLATFORM_ID_FIXTURES.sessionRun,
-    runtimeId: "runtime-envelope",
+    runtimeId: "openai-runtime",
     schemaVersion: RUNTIME_EVENT_SCHEMA_VERSION,
     sessionId: PLATFORM_ID_FIXTURES.session,
     traceId: "trace-envelope",
@@ -152,6 +152,11 @@ describe("runtime event ingress", () => {
       envelope({
         kind: "run.completed",
         payload: {
+          checkpoint: {
+            formatVersion: 1,
+            nativeRef: { kind: "openai_thread_id", runtimeId: "openai-runtime", value: "thread-1" },
+            runId: PLATFORM_ID_FIXTURES.sessionRun,
+          },
           lifecycle: "IDLE",
           run: {
             completedAt: OCCURRED_AT,
@@ -183,14 +188,14 @@ describe("runtime event ingress", () => {
       envelope({
         kind: "runtime.timing.recorded",
         payload: {
-          completedAtMs: 1_100,
+          completedAt: "1970-01-01T00:00:01.100Z",
           path: "warm",
           phases: [],
           runId: "run-payload",
           sessionId: "session-payload",
           source: "driver",
           stage: "driver_turn",
-          startedAtMs: 1_000,
+          startedAt: "1970-01-01T00:00:01.000Z",
           totalMs: 100,
           traceId: "trace-payload",
         },

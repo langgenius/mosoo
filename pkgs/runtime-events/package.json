@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@mosoo/ag-ui-session": "workspace:*",
+    "@mosoo/agent-driver": "workspace:*",
     "@mosoo/contracts": "workspace:*",
     "@mosoo/id": "workspace:*"
   },

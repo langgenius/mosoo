@@ -169,8 +169,8 @@ async function committedBoundary(database: D1Database) {
   await database
     .prepare(
       `INSERT INTO native_resume_ref (session_id, runtime_id, kind, value, observed_session_run_id,
-        committed_value, committed_session_run_id, created_at, updated_at)
-      VALUES (?, 'openai-runtime', 'thread', 'observed-native', ?, 'committed-native', ?, 2, 2)`,
+        committed_value, committed_session_run_id, committed_format_version, created_at, updated_at)
+      VALUES (?, 'openai-runtime', 'openai_thread_id', 'observed-native', ?, 'committed-native', ?, 1, 2, 2)`,
     )
     .bind(IDS.ownerSession, IDS.run, IDS.run)
     .run();
@@ -182,7 +182,18 @@ async function committedBoundary(database: D1Database) {
           id: createPlatformId(),
           kind: "run.completed",
           occurredAt: new Date().toISOString(),
-          payload: { stopReason: "end_turn" },
+          payload: {
+            stopReason: "end_turn",
+            checkpoint: {
+              formatVersion: 1,
+              runId: IDS.run,
+              nativeRef: {
+                kind: "openai_thread_id",
+                runtimeId: "openai-runtime",
+                value: "committed-native",
+              },
+            },
+          },
           runId: IDS.run,
           sessionId: IDS.ownerSession,
         }),
@@ -225,6 +236,23 @@ async function runOutcome(database: D1Database) {
 }
 
 describe("Session runtime maintenance", () => {
+  test("refuses maintenance after native reset while preserving the live Driver", async () => {
+    const { bindings, calls, database } = await setup();
+    await committedBoundary(database);
+    await database
+      .prepare(
+        "UPDATE native_resume_ref SET invalidated_at=3,invalidated_source_event_id='reset-1'",
+      )
+      .run();
+    await expect(restartSessionDriver(bindings, OWNER_VIEWER, input)).rejects.toThrow(
+      "after reset",
+    );
+    await expect(recreateSessionSandbox(bindings, OWNER_VIEWER, input)).rejects.toThrow(
+      "after reset",
+    );
+    expect(calls).toEqual([]);
+  });
+
   test("recreates a 90-day-idle direct Session and preserves committed state despite an old deadline", async () => {
     const { bindings, calls, database, siblingSandbox } = await setup();
     await committedBoundary(database);

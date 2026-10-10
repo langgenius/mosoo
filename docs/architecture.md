@@ -68,9 +68,31 @@ flowchart LR
 - **Boot:** Runtime writes the boot payload to a file in the Session's runtime home directory and passes its path in `MOSOO_DRIVER_BOOT_PAYLOAD_FILE`; the Driver reads and then deletes it, and checkpoints remove any leftover. The Driver binds no port: it dials `/api/driver/socket` with its `driverInstanceId`, a one-time boot token and a `traceparent`. The Worker only routes the upgrade; the `DriverConnection` DO verifies the token and owns readiness, commands, heartbeats and event ingestion.
 - **Environment:** the frozen EnvironmentRevision is restored before the Driver starts. npm and pip packages come from a Project-scoped artifact built off the hot path, and a Session cannot be created until that artifact is ready; then the setup script runs with the Environment's variables. Any failure blocks startup.
 - **Attachments:** during a turn whose input carries attachments, the Session's whole attachment prefix in `FILE_BUCKET` is mounted read-only into that Session's Sandbox and no other, and the mount is removed before every checkpoint.
-- **Commit gate (its only home):** when a turn ends successfully, Runtime removes the attachment mount and transient credentials, checkpoints the complete Session working directory (which also holds the runtime's native state) to the sandbox-state bucket, then commits the Run's completion, a `ready` `sandbox_backup` row bound to that Run and the native resume cursor in one guarded D1 batch. Until that batch lands, the turn is not successful and its Sandbox is not reclaimed. Failed and cancelled Runs never replace the last commit. Follow-up admission, idle reclamation and per-Session maintenance all wait for the Run-bound checkpoint and the Run's `run.completed` event.
+- **Commit gate (its only home):** successful `run.completed` includes a versioned native checkpoint descriptor with its Run ID and native reference.
+  The provider first publishes an immutable bundle at `.state/native-checkpoints/<runId>/`, containing a manifest and the native records required to resume that boundary.
+  Runtime verifies the descriptor, complete file list, sizes and SHA-256 hashes, rejecting links and special files.
+  It removes the attachment mount and transient credentials, archives the Session directory to the sandbox-state bucket, then commits Run completion, the `ready` backup, the native checkpoint reference, final assistant output and canonical terminal receipt in one guarded D1 batch.
+  Until that batch lands, the turn is not successful and its Sandbox is not reclaimed.
+  Failed and cancelled Runs never replace the last commit.
+  Follow-up admission, idle reclamation and per-Session maintenance wait for that committed boundary.
+  The instance completion RPC only confirms an already committed canonical completion; it cannot synthesize success.
+- **Event acknowledgments:** a receipt names the exact canonical event already stored in D1.
+  A repeated source ID with identical content returns its original sequence before any bundle read; changed content or a competing terminal outcome returns a terminal conflict.
+  Lost acknowledgments never require a cleaned-up local bundle to be recreated.
 - **Retention:** the latest committed checkpoint is kept while the Session exists (`SANDBOX_BACKUP_TTL_SECONDS`), survives archive, and is deleted with the Session.
-- **Continuation is native only:** a cold start restores the latest committed checkpoint and resumes the runtime's own conversation from the committed cursor. There is no transcript replay, and `session_event` history is never a recovery input. A missing or failed restore is an explicit error, never an empty workspace. Credentials and MCP authorization are resolved again on every activation.
+- **Continuation is native only:** every new Driver receives the committed checkpoint descriptor and matching native reference.
+  Runtime restores that Run's exact ready backup into an isolated temporary directory, validates its selected native bundle and copies only that bundle into the current Session directory.
+  Native extraction uses a separate archive and preserves every mount and backing file used by the current workspace.
+  The provider rebuilds its native home from the bundle before starting a native process, including when the current workspace is nonempty.
+  Existing workspace archive and restore behavior remains separate; the archive does not promise a transactional snapshot of user files, and native recovery does not roll those files back.
+  There is no transcript replay, and `session_event` history is never a recovery input.
+  A missing or failed native restore is an explicit error.
+  Credentials and MCP authorization are resolved again on every activation.
+- **Native reset:** a session-scoped reset records its source ID, expected previous checkpoint and new native reference.
+  Runtime atomically writes the reset receipt and an invalidation tombstone while retaining the old committed identity.
+  Replaying an old reset only returns its receipt and cannot invalidate a later successful Run.
+  First use, a committed checkpoint and an invalidated checkpoint are distinct states.
+  A live Driver may continue after the reset acknowledgment; cold activation is refused until a subsequent successful Run commits a new bundle.
 - **Per-Session maintenance:** Restart Driver and Recreate Sandbox act on one Session and keep its ID, frozen configuration, committed workspace and native cursor.
 - **Prewarm:** reading history or opening a viewer never starts a Sandbox. Creating a Session without input, and composer activity in the console, schedule a best-effort prewarm that runs the same activation path without admitting a turn and skips a Session with an active Run.
 - **Adding a runtime:** runtimes are defined in `pkgs/runtime-catalog`. A new one lands together with its Driver backend (`SUPPORTED_DRIVER_RUNTIMES` and `apps/driver/runtime-images.json`), a `RUNTIME_SANDBOX_IMAGES` entry, and a container class, Durable Object binding and append-only `new_sqlite_classes` migration in every Wrangler environment. `apps/api/tests/runtime-sandbox-images.test.ts` and `apps/api/tests/preview-runtime-release-gate.test.ts` enforce this.
@@ -104,4 +126,8 @@ Each stays only while stored data or a client still needs it; remove one only wi
 - Execution snapshots without `configJson`, which read the configuration of the Agent or live version they recorded.
 - Environment revisions with `apt`, `cargo`, `gem` or `go` packages, which stay readable but cannot be saved or provisioned; only `WRITABLE_ENVIRONMENT_PACKAGE_MANAGERS` are.
 - Custom credentials and older custom Session snapshots without a declared model protocol, which keep their runtime's historical protocol: Responses for `openai-runtime`, Chat Completions otherwise.
-- Sessions whose successful turns all predate the commit gate keep `workspace_checkpoint_required` false and may continue from their saved artifacts without a workspace checkpoint.
+- Legacy native references without a verified bundle format cannot activate under the new Driver contract.
+  Automatic migration is not implemented; recovery requires manual verification of the original archive's native records against its committed Run, with native writers stopped.
+  Repackaging an archive cannot establish a boundary the archive does not prove.
+  When verification fails, retain the data and keep that Session on an isolated compatible deployment; do not resume it as an empty conversation.
+  Cutover and rollback require the [operator checks](./production-deploy-verification.md#native-checkpoint-cutover).

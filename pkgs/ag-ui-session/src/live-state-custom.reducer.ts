@@ -2,7 +2,7 @@ import type { MosooCustomEvent, MosooSessionFileChange } from "./ag-ui-session-e
 import { MOSOO_CUSTOM_EVENT as CUSTOM_EVENT_REGISTRY } from "./custom-event-registry";
 import type { SessionLiveState } from "./live-state";
 import { updateSessionMetadataState } from "./live-state-custom-metadata.reducer";
-import { normalizeMessagePlan } from "./live-state-message.reducer";
+import { normalizeMessagePlan, updateToolArgs } from "./live-state-message.reducer";
 import {
   currentIsoTimestamp,
   isTerminalRunStatus,
@@ -279,6 +279,10 @@ export function updateCustomState(
 ): SessionLiveState {
   // This switch intentionally handles the runtime slice of MosooCustomEvent.
   switch (event.name) {
+    case CUSTOM_EVENT_REGISTRY.sessionToolInputUpdated.name: {
+      return updateToolArgs(state, event.value);
+    }
+
     case CUSTOM_EVENT_REGISTRY.sessionPlanUpdated.name: {
       return touchSessionLiveState({
         ...state,

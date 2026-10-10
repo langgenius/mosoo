@@ -59,6 +59,7 @@ function createDriverStopDatabase(): SqliteD1Database {
     );
 
     CREATE TABLE session_event (
+      canonical_event_json text,
       run_id text,
       event_type text NOT NULL
     );

@@ -1,3 +1,4 @@
+import type { DriverCommandUpdateInput } from "@mosoo/agent-driver/orpc";
 import type { RuntimeCommand, RuntimeCommandStatus } from "@mosoo/contracts/runtime-command";
 import { driverCommandsTable, driverInstancesTable } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
@@ -9,6 +10,18 @@ import type { AppDatabase } from "../../../../platform/db/drizzle";
 import { currentTimestampMs } from "../../../../time";
 import { decideRuntimeCommandTransition } from "./runtime-command-transition";
 import type { RuntimeCommandTransitionOutcome } from "./runtime-command-transition";
+
+function canonicalPayloadJson(value: unknown): string {
+  return JSON.stringify(value ?? null, (_key, entry: unknown) =>
+    entry !== null && typeof entry === "object" && !Array.isArray(entry)
+      ? Object.fromEntries(
+          Object.entries(entry).toSorted(([left], [right]) =>
+            left < right ? -1 : left > right ? 1 : 0,
+          ),
+        )
+      : entry,
+  );
+}
 
 async function getNextRuntimeCommandSeq(
   database: D1Database,
@@ -75,22 +88,32 @@ export async function updateRuntimeCommandRecord(
   database: D1Database,
   input: {
     commandId: DriverCommandId;
+    connectionId: string;
     driverInstanceId: DriverInstanceId;
+    error?: Extract<DriverCommandUpdateInput, { status: "failed" }>["error"];
+    result?: Extract<DriverCommandUpdateInput, { status: "completed" }>["result"];
     status: RuntimeCommandStatus;
   },
 ): Promise<RuntimeCommandTransitionOutcome> {
-  const current =
-    (await getAppDatabase(database)
-      .select({ status: driverCommandsTable.status })
+  const db = getAppDatabase(database);
+  const readCurrent = () =>
+    db
+      .select({
+        errorJson: driverCommandsTable.errorJson,
+        resultJson: driverCommandsTable.resultJson,
+        status: driverCommandsTable.status,
+      })
       .from(driverCommandsTable)
       .where(
         and(
           eq(driverCommandsTable.id, input.commandId),
           eq(driverCommandsTable.driverInstanceId, input.driverInstanceId),
+          activeConnectionCondition(db, input),
         ),
       )
       .limit(1)
-      .get()) ?? null;
+      .get();
+  const current = (await readCurrent()) ?? null;
 
   if (current === null) {
     return {
@@ -102,31 +125,48 @@ export async function updateRuntimeCommandRecord(
   }
 
   const transition = decideRuntimeCommandTransition(current.status, input.status);
+  const matchesPayload = (row: typeof current) =>
+    canonicalPayloadJson(row.errorJson === null ? null : JSON.parse(row.errorJson)) ===
+      canonicalPayloadJson(input.error) &&
+    canonicalPayloadJson(row.resultJson === null ? null : JSON.parse(row.resultJson)) ===
+      canonicalPayloadJson(input.result);
+  const conflict = {
+    currentStatus: current.status,
+    kind: "rejected",
+    reason: "illegal_transition",
+    targetStatus: input.status,
+  } as const;
 
   if (transition.kind !== "applied") {
-    return transition;
+    return transition.kind === "duplicate" && !matchesPayload(current) ? conflict : transition;
   }
 
-  const result = await getAppDatabase(database)
+  const result = await db
     .update(driverCommandsTable)
-    .set({ status: input.status })
+    .set({
+      ...(input.status === "accepted" ? { ackedAt: currentTimestampMs() } : {}),
+      ...(["cancelled", "completed", "failed", "expired"].includes(input.status)
+        ? { completedAt: currentTimestampMs() }
+        : {}),
+      errorJson: input.error === undefined ? null : JSON.stringify(input.error),
+      resultJson: input.result === undefined ? null : JSON.stringify(input.result),
+      status: input.status,
+    })
     .where(
       and(
         eq(driverCommandsTable.id, input.commandId),
         eq(driverCommandsTable.driverInstanceId, input.driverInstanceId),
         eq(driverCommandsTable.status, current.status),
+        activeConnectionCondition(db, input),
       ),
     )
     .run();
 
-  return getD1ChangeCount(result) > 0
-    ? transition
-    : {
-        currentStatus: current.status,
-        kind: "rejected",
-        reason: "illegal_transition",
-        targetStatus: input.status,
-      };
+  if (getD1ChangeCount(result) > 0) return transition;
+  const settled = await readCurrent();
+  return settled?.status === input.status && matchesPayload(settled)
+    ? { kind: "duplicate", status: input.status }
+    : conflict;
 }
 
 export async function getRuntimeCommandKind(
@@ -192,7 +232,7 @@ export async function claimNextQueuedRuntimeCommand(
   const claimed =
     (await db
       .update(driverCommandsTable)
-      .set({ status: "delivered" })
+      .set({ deliveryConnectionId: connectionId, status: "delivered" })
       .where(
         and(
           inArray(driverCommandsTable.id, nextQueuedCommand),

@@ -50,7 +50,12 @@ export class DriverInstanceRpcCommandController {
 
     const updateOutcome = await updateRuntimeCommandRecord(env.DB, {
       commandId,
+      connectionId: context.connectionId,
       driverInstanceId,
+      ...(input.status === "failed" ? { error: input.error } : {}),
+      ...(input.status === "completed" && input.result !== undefined
+        ? { result: input.result }
+        : {}),
       status: input.status,
     });
     context.assertActiveConnection();
@@ -61,10 +66,7 @@ export class DriverInstanceRpcCommandController {
 
     if (
       commandKind === "input.start" &&
-      (input.status === "completed" ||
-        input.status === "failed" ||
-        input.status === "cancelled" ||
-        input.status === "expired")
+      (input.status === "completed" || input.status === "failed" || input.status === "cancelled")
     ) {
       const release = releaseLinkedTerminalDriverInstanceSessionRun(env, driverInstanceId).catch(
         (error: unknown) => {

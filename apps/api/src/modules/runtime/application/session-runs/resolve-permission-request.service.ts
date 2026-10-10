@@ -1,6 +1,6 @@
 import { driverInstancesTable, sessionRunsTable } from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
-import type { DriverInstanceId, SessionId } from "@mosoo/id";
+import type { DriverInstanceId, SessionId, SessionRunId } from "@mosoo/id";
 import { and, eq, inArray } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
@@ -12,11 +12,12 @@ interface ResolveDriverPermissionInput {
   decision: "allow_once" | "reject_once";
   driverInstanceId: DriverInstanceId;
   requestId: string;
+  runId: SessionRunId;
   sessionId: SessionId;
 }
 
 // The caller authorized the Session. The Driver id comes from Driver-emitted
-// live state, so it must belong to an active Run of that Session.
+// live state, so it must belong to the request's active Run of that Session.
 export async function resolvePermissionRequest(
   bindings: ApiBindings,
   input: ResolveDriverPermissionInput,
@@ -35,6 +36,7 @@ export async function resolvePermissionRequest(
       .where(
         and(
           eq(driverInstancesTable.id, input.driverInstanceId),
+          eq(sessionRunsTable.id, input.runId),
           eq(sessionRunsTable.sessionId, input.sessionId),
         ),
       )
@@ -50,5 +52,6 @@ export async function resolvePermissionRequest(
     decision: input.decision,
     kind: "permission.resolve",
     requestId: input.requestId,
+    runId: input.runId,
   });
 }

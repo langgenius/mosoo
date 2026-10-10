@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 
+import { DRIVER_PROTOCOL_VERSION } from "@mosoo/agent-driver/boot";
 import { getSessionOrganizationPath, getSessionRuntimeStatePath } from "@mosoo/agent-driver/paths";
 import { PLATFORM_ID_FIXTURES as ids } from "@mosoo/id/testing";
 import { getRuntimeCatalogEntry, resolveRuntimeModelProtocol } from "@mosoo/runtime-catalog";
@@ -102,7 +103,8 @@ test("Given a Pi session, When creating its execution, Then preserve checkpointe
   const input = piInput();
   const spec = await buildExecutionSpec({ RUNTIME_ACTION_TOKEN_SECRET: "pi-product-test" }, input);
   expect(spec.session.context.homePath.startsWith(`${spec.session.cwd}/`)).toBe(true);
-  expect(spec.session.nativeResumeRequired).toBe(true);
+  expect(spec.session.nativeCheckpoint).toBeNull();
+  expect(spec.session.nativeResumeRef).toBeNull();
   expect(spec.provider).toBe("openai-compatible");
 });
 
@@ -179,7 +181,7 @@ test("Given a Pi session, When claiming a Driver and receiving native state, The
       .prepare("SELECT runtime, protocol_version FROM driver_instance WHERE id = ?")
       .bind(API_DRIVER_BOUNDARY_IDS.driverInstance)
       .first(),
-  ).toMatchObject({ runtime: "pi", protocol_version: 6 });
+  ).toMatchObject({ runtime: "pi", protocol_version: DRIVER_PROTOCOL_VERSION });
   expect(
     await db
       .prepare(

@@ -5,6 +5,7 @@ import {
   createInitialSessionLiveState,
   createLiveStateMessage,
   MOSOO_CUSTOM_EVENT,
+  parseServerCustomEvent,
 } from "@mosoo/ag-ui-session";
 import type { AgUiSessionEvent, SessionLiveState } from "@mosoo/ag-ui-session";
 
@@ -37,6 +38,72 @@ function runUpdated(run: SessionLiveState["run"]): AgUiSessionEvent {
 }
 
 describe("session live-state transcript reducer", () => {
+  test("replaces tool input snapshots and appends later deltas in delivery order", () => {
+    const started = applyAgUiEventsToSessionLiveState(baseState(), [
+      {
+        parentMessageId: "assistant-1",
+        toolCallId: "tool-1",
+        toolCallName: "Shell",
+        type: "TOOL_CALL_START",
+      },
+    ]);
+    const snapshot = (rawInput: string) =>
+      parseServerCustomEvent(MOSOO_CUSTOM_EVENT.sessionToolInputUpdated.name, {
+        rawInput,
+        toolCallId: "tool-1",
+      });
+    const partial = applyAgUiEventsToSessionLiveState(started, [
+      { delta: '{"cmd":"old', toolCallId: "tool-1", type: "TOOL_CALL_ARGS" },
+      snapshot('{"cmd":"new'),
+      { delta: " value", toolCallId: "tool-1", type: "TOOL_CALL_ARGS" },
+    ]);
+    expect(partial.messages[0]?.segments).toMatchObject([{ argsText: '{"cmd":"new value' }]);
+    const next = applyAgUiEventsToSessionLiveState(partial, [
+      snapshot('{"cmd":"new value"}'),
+      snapshot('{"cmd":"new value"}'),
+    ]);
+    expect(next.messages[0]?.segments).toMatchObject([
+      { argsText: '{"cmd":"new value"}', kind: "tool_use", toolCallId: "tool-1" },
+    ]);
+    expect(started.messages[0]?.segments).toMatchObject([{ argsText: "" }]);
+
+    const reconnected = applyAgUiEventsToSessionLiveState(baseState(), [
+      { snapshot: next, type: "STATE_SNAPSHOT" },
+      snapshot('{"cmd":"new value"}'),
+    ]);
+    expect(reconnected.messages).toEqual(next.messages);
+  });
+
+  test("preserves snapshots for separate tools and allows a snapshot to clear arguments", () => {
+    const events: AgUiSessionEvent[] = ["tool-1", "tool-2"].flatMap((toolCallId) => [
+      {
+        parentMessageId: "assistant-1",
+        toolCallId,
+        toolCallName: "Shell",
+        type: "TOOL_CALL_START",
+      },
+      parseServerCustomEvent(MOSOO_CUSTOM_EVENT.sessionToolInputUpdated.name, {
+        rawInput: `{"id":"${toolCallId}"}`,
+        toolCallId,
+      }),
+    ]);
+    const state = applyAgUiEventsToSessionLiveState(baseState(), events);
+    expect(state.messages[0]?.segments).toMatchObject([
+      { argsText: '{"id":"tool-1"}', toolCallId: "tool-1" },
+      { argsText: '{"id":"tool-2"}', toolCallId: "tool-2" },
+    ]);
+    const cleared = applyAgUiEventsToSessionLiveState(state, [
+      parseServerCustomEvent(MOSOO_CUSTOM_EVENT.sessionToolInputUpdated.name, {
+        rawInput: "",
+        toolCallId: "tool-1",
+      }),
+    ]);
+    expect(cleared.messages[0]?.segments).toMatchObject([
+      { argsText: "", toolCallId: "tool-1" },
+      { argsText: '{"id":"tool-2"}', toolCallId: "tool-2" },
+    ]);
+  });
+
   test("replaces live state when a state snapshot arrives", () => {
     const userMessage = createLiveStateMessage({
       content: "hello",

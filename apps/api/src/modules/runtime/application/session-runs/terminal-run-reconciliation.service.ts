@@ -2,20 +2,23 @@ import type { SessionStatus } from "@mosoo/contracts/session";
 import type { SessionRunSummary } from "@mosoo/contracts/session-run";
 import {
   driverInstancesTable,
+  sandboxBackupsTable,
   sessionEventsTable,
   sessionModelCallsTable,
   sessionRunsTable,
   sessionsTable,
 } from "@mosoo/db";
 import type { SessionId, SessionRunId } from "@mosoo/id";
-import { and, asc, eq, exists, inArray, isNull, not, or } from "drizzle-orm";
+import { and, asc, eq, exists, inArray, isNotNull, isNull, not, or } from "drizzle-orm";
 
+import { logWarn } from "../../../../platform/cloudflare/logger";
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../../platform/db/drizzle";
 import { appendSessionRuntimeEvents } from "../../../sessions/application/session-event-write.service";
 import { finalizeSessionModelCallUsage } from "../../../sessions/infrastructure/session-model-call.repository";
 import { TERMINAL_SESSION_RUN_STATUSES } from "../../domain/session-run-lifecycle.machine";
 import { createSessionRunTerminalSourceId } from "../../domain/session-run-terminal-event-id";
+import { getSessionRunCompletionProof } from "../../infrastructure/session-runs/session-run-completion-proof";
 import {
   getSessionRunSummariesByIds,
   setSessionRunStatus,
@@ -28,6 +31,14 @@ import {
 } from "./session-run-view-events.service";
 
 const TERMINAL_DRIVER_STATUSES = ["failed", "stopped"] as const;
+
+class MissingCompletionProofError extends Error {
+  constructor() {
+    super(
+      "Completed Run reconciliation requires its committed checkpoint, ready backup, and canonical receipt.",
+    );
+  }
+}
 
 interface TerminalRunCandidate {
   readonly runId: SessionRunId;
@@ -50,7 +61,7 @@ interface RepairTerminalSessionRunProjectionsInput {
 }
 
 function createTerminalRunRecoveryEvent(input: {
-  readonly kind: "run.cancelled" | "run.completed" | "run.failed";
+  readonly kind: "run.cancelled" | "run.failed";
   readonly run: SessionRunSummary;
   readonly sessionId: SessionId;
   readonly sourceEventId: string;
@@ -92,6 +103,31 @@ async function findTerminalRunCandidates(
     eq(sessionsTable.lastRunId, sessionRunsTable.id),
     eq(sessionsTable.status, "RUNNING"),
   );
+  const completionCanBeVerified = and(
+    exists(
+      database
+        .select({ id: sessionEventsTable.id })
+        .from(sessionEventsTable)
+        .where(
+          and(
+            eq(sessionEventsTable.runId, sessionRunsTable.id),
+            eq(sessionEventsTable.eventType, "run.completed"),
+            isNotNull(sessionEventsTable.canonicalEventJson),
+          ),
+        ),
+    ),
+    exists(
+      database
+        .select({ id: sandboxBackupsTable.id })
+        .from(sandboxBackupsTable)
+        .where(
+          and(
+            eq(sandboxBackupsTable.sessionRunId, sessionRunsTable.id),
+            eq(sandboxBackupsTable.status, "ready"),
+          ),
+        ),
+    ),
+  );
 
   return database
     .select({
@@ -107,6 +143,7 @@ async function findTerminalRunCandidates(
     .where(
       and(
         inArray(sessionRunsTable.status, TERMINAL_SESSION_RUN_STATUSES),
+        or(not(eq(sessionRunsTable.status, "completed")), completionCanBeVerified),
         isNull(sessionsTable.archivedAt),
         inArray(sessionsTable.status, ["IDLE", "RESCHEDULING", "RUNNING"]),
         or(
@@ -126,6 +163,17 @@ export async function repairTerminalSessionRunProjections(
   bindings: ApiBindings,
   input: RepairTerminalSessionRunProjectionsInput,
 ): Promise<boolean> {
+  const kind = toTerminalRunEventKind(input.run.status);
+  if (
+    kind === "run.completed" &&
+    (await getSessionRunCompletionProof(bindings.DB, {
+      runId: input.run.id,
+      sessionId: input.sessionId,
+    })) === null
+  ) {
+    throw new MissingCompletionProofError();
+  }
+
   const projection = await setSessionRunStatus(bindings.DB, {
     preserveSessionLifecycle: input.preserveSessionLifecycle,
     runId: input.run.id,
@@ -136,7 +184,7 @@ export async function repairTerminalSessionRunProjections(
     throw new Error("Terminal run reconciliation lost a concurrent run transition.");
   }
   const usageFinalized = await finalizeSessionModelCallUsage(bindings.DB, input.run.id);
-  const kind = toTerminalRunEventKind(input.run.status);
+  if (kind === "run.completed") return usageFinalized;
 
   const terminalEventExists =
     input.terminalEventExists ??
@@ -168,11 +216,8 @@ export async function repairTerminalSessionRunProjections(
 }
 
 /**
- * Repairs terminal Run projections after the Driver can no longer replay its
- * final event. The terminal Run row itself is the durable, idempotent repair
- * obligation: a missing matching terminal session_event is reconstructed with
- * a stable source id, while a duplicate status transition repairs the owning
- * Session lifecycle projection.
+ * Success requires the original atomic checkpoint receipt; only failure and
+ * cancellation events can be reconstructed from a terminal Run row alone.
  */
 export async function reconcileTerminalSessionRuns(
   bindings: ApiBindings,
@@ -195,13 +240,24 @@ export async function reconcileTerminalSessionRuns(
       continue;
     }
 
-    const repaired = await repairTerminalSessionRunProjections(bindings, {
-      preserveSessionLifecycle:
-        candidate.sessionLastRunId !== run.id || candidate.sessionStatus !== "RUNNING",
-      run,
-      sessionId: candidate.sessionId,
-      terminalEventExists: candidate.terminalEventExists === 1,
-    });
+    let repaired: boolean;
+    try {
+      repaired = await repairTerminalSessionRunProjections(bindings, {
+        preserveSessionLifecycle:
+          candidate.sessionLastRunId !== run.id || candidate.sessionStatus !== "RUNNING",
+        run,
+        sessionId: candidate.sessionId,
+        terminalEventExists: candidate.terminalEventExists === 1,
+      });
+    } catch (error) {
+      if (!(error instanceof MissingCompletionProofError)) throw error;
+      logWarn("session.run.completion_repair_skipped", {
+        errorMessage: error.message,
+        runId: run.id,
+        sessionId: candidate.sessionId,
+      });
+      continue;
+    }
     if (repaired) reconciledRunIds.push(run.id);
 
     reconciledSessionIds.add(candidate.sessionId);

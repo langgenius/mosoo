@@ -4,7 +4,12 @@ import type {
   SessionRuntimeOperationResult,
 } from "@mosoo/contracts/session";
 import type { RunError } from "@mosoo/contracts/session-run";
-import { sandboxSessionsTable, sandboxesTable, sessionsTable } from "@mosoo/db";
+import {
+  nativeResumeRefsTable,
+  sandboxSessionsTable,
+  sandboxesTable,
+  sessionsTable,
+} from "@mosoo/db";
 import { createPlatformId } from "@mosoo/id";
 import type {
   AccountId,
@@ -27,6 +32,7 @@ import {
   createSessionRuntimeEvent,
 } from "../../sessions/application/session-event-write.service";
 import { assertPreviewAvailable } from "../../sessions/infrastructure/preview-retention.repository";
+import { noNativeCheckpointInvalidation } from "../infrastructure/native-resume-ref.repository";
 import { stopRuntimeSubjectDrivers } from "../infrastructure/runtime-subject-lifecycle/runtime-subject-driver-stop";
 import { recreateRuntimeSubjectPreservingState } from "../infrastructure/runtime-subject-lifecycle/runtime-subject-operations.service";
 import { createSessionStatusTransitionPatch } from "../infrastructure/session-runs/session-lifecycle-projection.repository";
@@ -66,6 +72,7 @@ async function resolveSessionRuntimeOperationTarget(
       agentId: sessionsTable.agentId,
       archivedAt: sessionsTable.archivedAt,
       lastRunId: sessionsTable.lastRunId,
+      nativeCheckpointInvalidatedAt: nativeResumeRefsTable.invalidatedAt,
       runtimeSubjectId: sandboxesTable.id,
       sandboxId: sandboxSessionsTable.sandboxId,
       sandboxProjectId: sandboxesTable.projectId,
@@ -80,6 +87,7 @@ async function resolveSessionRuntimeOperationTarget(
     .from(sessionsTable)
     .leftJoin(sandboxSessionsTable, eq(sandboxSessionsTable.sessionId, sessionsTable.id))
     .leftJoin(sandboxesTable, eq(sandboxesTable.id, sandboxSessionsTable.sandboxId))
+    .leftJoin(nativeResumeRefsTable, eq(nativeResumeRefsTable.sessionId, sessionsTable.id))
     .where(and(eq(sessionsTable.id, input.sessionId), eq(sessionsTable.projectId, input.projectId)))
     .get();
 
@@ -92,6 +100,12 @@ async function resolveSessionRuntimeOperationTarget(
   ) {
     throw sessionRuntimeOperationUnavailable(
       "Session is archived, stopped, or already undergoing maintenance.",
+    );
+  }
+  if (row.nativeCheckpointInvalidatedAt !== null) {
+    throw createApiError(
+      API_ERROR_CODE.sessionRunCheckpointPending,
+      "Session maintenance must wait for a successful native checkpoint after reset.",
     );
   }
   if (row.sandboxId === null) {
@@ -250,6 +264,7 @@ async function executeSessionRuntimeOperation(
           ? isNull(sessionsTable.lastRunId)
           : eq(sessionsTable.lastRunId, target.lastRunId),
         isNull(sessionsTable.statusOperationId),
+        noNativeCheckpointInvalidation(getAppDatabase(bindings.DB), target.sessionId),
       ),
     )
     .returning({ id: sessionsTable.id })
