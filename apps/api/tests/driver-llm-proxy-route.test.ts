@@ -321,7 +321,9 @@ describe("driver LLM proxy route", () => {
           },
           requestUrl: `http://127.0.0.1:${proxy.port}/api/sessions`,
         });
-        const events = await (runtimeId === "pi" ? runPiProxyTurn(env) : runOpenCodeProxyTurn(env));
+        const events = await (runtimeId === "pi"
+          ? runPiProxyTurn(env, { provider: "openai-compatible", model: "pi-test" })
+          : runOpenCodeProxyTurn(env));
         expect(modelCalls).toBe(2);
         if (runtimeId === "pi") {
           expect(
@@ -442,7 +444,11 @@ describe("driver LLM proxy route", () => {
           },
           requestUrl: `http://127.0.0.1:${proxy.port}/api/sessions`,
         });
-        const events = await runPiProxyTurn(env, "high");
+        const events = await runPiProxyTurn(env, {
+          provider: vendorId,
+          model,
+          thinkingLevel: "high",
+        });
         expect(modelCalls).toBe(2);
         const state = events.find((event) => event["id"] === "test-state");
         expect(state).toMatchObject({ data: { model: { provider, id: model, reasoning: true } } });

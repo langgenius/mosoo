@@ -56,9 +56,10 @@ test("Given a Pi credential, When provisioning, Then bind a Chat Completions gra
       },
     },
   });
-  expect(
-    JSON.parse(variables.MOSOO_PI_CONFIG_CONTENT ?? "{}").providers["openai-compatible"].baseUrl,
-  ).toBe(`https://api.example.com/api/driver/llm/proxy/${ids.vendorCredential}`);
+  expect(JSON.parse(variables.MOSOO_PI_CONFIG_CONTENT ?? "{}")).toEqual({
+    baseUrl: `https://api.example.com/api/driver/llm/proxy/${ids.vendorCredential}`,
+    modelProtocol: "openai-chat-completions",
+  });
   expect(
     await verifyRuntimeActionToken(bindings, variables.MOSOO_PI_PROXY_GRANT ?? ""),
   ).toMatchObject({

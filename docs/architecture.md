@@ -59,6 +59,7 @@ flowchart LR
 - **MCP** traffic goes through the Worker's MCP proxy, which checks the grant's Driver instance and generation are active before reading the upstream credential or creating delegation context.
   It adds a delegation token carrying the end-user `userId` only when the Session has one.
 - **Model protocol:** one protocol is resolved from the preset provider/model or from the custom credential's declared protocol, checked against the runtime, and frozen into the Session plan. Continuation fails if the credential's protocol later changes.
+  For Pi, the Host supplies the proxy connection and protocol; the Driver derives native model configuration from the frozen execution and the installed Pi catalog.
 - **Network:** an Environment is `full` (container defaults) or `limited`: no direct internet, and a deny-by-default HTTP(S) allowlist of the Environment's hosts, the API control origin and the R2 endpoint, checked on every outbound request including each redirect hop. The policy is applied before the container starts and is fixed for the subject's lifetime: a different policy fails closed. A `limited` Environment rejects proxy variables. Where `limited` cannot be enforced (local workerd), startup fails closed.
 
 ## 5. Runtime: subjects, Driver and checkpoints
