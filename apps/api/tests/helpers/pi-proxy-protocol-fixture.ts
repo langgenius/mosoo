@@ -6,6 +6,9 @@ import { fileURLToPath } from "node:url";
 
 import type { PresetModelProtocol } from "@mosoo/contracts/models";
 
+import { readPiModelConfiguration } from "../../../driver/src/runtimes/pi/pi-configuration";
+import { PI_MODEL_CONFIGURATION_SOURCE } from "../../../driver/src/runtimes/pi/pi-model-configuration";
+
 const piCli = fileURLToPath(
   new URL(
     "../../../driver/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js",
@@ -187,16 +190,29 @@ export function piProxyProtocolResponse(protocol: PresetModelProtocol, tool: boo
   }
 }
 
+interface PiProxyModel {
+  provider: string;
+  model: string;
+  thinkingLevel?: string;
+}
+
 /** Real pinned Pi CLI, with all model traffic directed at the test's Host proxy. */
 export async function runPiProxyTurn(
   variables: Record<string, string>,
+  input: PiProxyModel,
 ): Promise<Record<string, unknown>[]> {
+  const configuration = readPiModelConfiguration({
+    provider: input.provider,
+    model: input.model,
+    providerOptions:
+      input.thinkingLevel === undefined ? {} : { thinkingLevel: input.thinkingLevel },
+    environment: { variables },
+  });
+  const { provider, model, thinkingLevel } = configuration;
   const home = await mkdtemp(join(tmpdir(), "mosoo-pi-proxy-"));
   const agentDir = join(home, "pi");
   await mkdir(agentDir);
-  await writeFile(join(agentDir, "models.json"), variables["MOSOO_PI_CONFIG_CONTENT"] ?? "", {
-    mode: 0o600,
-  });
+  await writeFile(join(agentDir, "models.json"), "{}", { mode: 0o600 });
   await writeFile(
     join(agentDir, "settings.json"),
     JSON.stringify({
@@ -207,6 +223,11 @@ export async function runPiProxyTurn(
       promptTemplates: [],
     }),
   );
+  const extension = join(agentDir, "mosoo-model.mjs");
+  await writeFile(
+    extension,
+    `${PI_MODEL_CONFIGURATION_SOURCE}\nexport default function(pi) { configurePiModel(pi, ${JSON.stringify(configuration)}); }`,
+  );
   const child = spawn(
     "node",
     [
@@ -214,9 +235,12 @@ export async function runPiProxyTurn(
       "--mode",
       "rpc",
       "--provider",
-      "mosoo",
+      provider,
       "--model",
-      "pi-test",
+      model,
+      "--extension",
+      extension,
+      ...(thinkingLevel === undefined ? [] : ["--thinking", thinkingLevel]),
       "--offline",
       "--no-extensions",
       "--no-skills",
@@ -276,6 +300,7 @@ export async function runPiProxyTurn(
     25_000,
   );
   try {
+    child.stdin.write(`${JSON.stringify({ id: "test-state", type: "get_state" })}\n`);
     child.stdin.write(
       `${JSON.stringify({ id: "test-prompt", type: "prompt", message: "Run the provided bash tool and then finish." })}\n`,
     );

@@ -201,6 +201,7 @@ describe("API to driver boundary", () => {
       verifyRuntimeActionToken(bindings, activeMcpServer.proxyGrantId),
     ).resolves.toMatchObject({
       action: "mcp_proxy",
+      driverGeneration: 7,
       driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
       resourceId: API_DRIVER_BOUNDARY_IDS.mcpServerLinear,
     });

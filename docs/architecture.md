@@ -56,8 +56,10 @@ flowchart LR
 - **Principals:** a browser session or a CLI login token (`mcli_`) acts as the account; a Project key (`msp_`) acts as the account inside one Project. Account-only operations, including key management, reject Project keys. For Project keys, Public API rate limits and idempotency are keyed by the Project, so rotating a key neither resets them nor repeats work; each Run records `created_by_key_id`.
 - **Secrets:** provider keys, MCP credentials and Environment secrets are envelope-encrypted in `vault_secret` under `VAULT_ROOT_SECRET`; API keys are stored only as SHA-256 hashes. Credentials resolve inside the Session's Project and fail closed.
 - **Raw provider keys never enter a Sandbox.** The Driver gets an expiring grant bound to one credential, model, model protocol and Driver generation, and calls the Worker's LLM proxy (`/api/driver/llm/proxy/:credentialId/*`), which reads the vault on each request and adds the upstream auth. Environment variables cannot override the vendor variables mosoo sets for that proxy.
-- **MCP** traffic goes through the Worker's MCP proxy, which holds the upstream credential and adds a delegation token carrying the end-user `userId` only when the Session has one.
+- **MCP** traffic goes through the Worker's MCP proxy, which checks the grant's Driver instance and generation are active before reading the upstream credential or creating delegation context.
+  It adds a delegation token carrying the end-user `userId` only when the Session has one.
 - **Model protocol:** one protocol is resolved from the preset provider/model or from the custom credential's declared protocol, checked against the runtime, and frozen into the Session plan. Continuation fails if the credential's protocol later changes.
+  For Pi, the Host supplies the proxy connection and protocol; the Driver derives native model configuration from the frozen execution and the installed Pi catalog.
 - **Network:** an Environment is `full` (container defaults) or `limited`: no direct internet, and a deny-by-default HTTP(S) allowlist of the Environment's hosts, the API control origin and the R2 endpoint, checked on every outbound request including each redirect hop. The policy is applied before the container starts and is fixed for the subject's lifetime: a different policy fails closed. A `limited` Environment rejects proxy variables. Where `limited` cannot be enforced (local workerd), startup fails closed.
 
 ## 5. Runtime: subjects, Driver and checkpoints
@@ -84,6 +86,8 @@ flowchart LR
   Runtime restores that Run's exact ready backup into an isolated temporary directory, validates its selected native bundle and copies only that bundle into the current Session directory.
   Native extraction uses a separate archive and preserves every mount and backing file used by the current workspace.
   The provider rebuilds its native home from the bundle before starting a native process, including when the current workspace is nonempty.
+  Pi bundles its session records and native Bash and MCP output files from its private temporary directory, preserving the paths referenced by the conversation.
+  Missing referenced output, changed file content or a path outside that directory prevents checkpoint creation or restore.
   Existing workspace archive and restore behavior remains separate; the archive does not promise a transactional snapshot of user files, and native recovery does not roll those files back.
   There is no transcript replay, and `session_event` history is never a recovery input.
   A missing or failed native restore is an explicit error.

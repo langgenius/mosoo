@@ -637,6 +637,7 @@ export function registerDriverRoute(app: Hono<ApiGatewayEnvironment>) {
 
     try {
       target = await resolveRuntimeMcpProxyTarget(c.env, {
+        driverGeneration: grant.driverGeneration,
         driverInstanceId: grant.driverInstanceId,
         serverId: grant.resourceId,
         toolCallId,
