@@ -11,6 +11,7 @@ import {
   appendToolResult,
   appendToolUse,
   createLiveStateMessage,
+  completeReasoning,
   startReasoning,
   upsertMessage,
 } from "./live-state-message.reducer";
@@ -102,7 +103,9 @@ function applyEvent(state: SessionLiveState, event: AgUiSessionEvent): SessionLi
         messageId: event.messageId,
       });
     }
-    case EventType.REASONING_MESSAGE_END:
+    case EventType.REASONING_MESSAGE_END: {
+      return completeReasoning(currentState, event.messageId);
+    }
     case EventType.TEXT_MESSAGE_END:
     case EventType.TOOL_CALL_END: {
       return currentState;

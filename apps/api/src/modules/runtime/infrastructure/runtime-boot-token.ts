@@ -20,7 +20,6 @@ export interface CreateBootPayloadInput {
   bootToken: string;
   controlUrl: string;
   driverControlPort: number;
-  driverGeneration: number;
   driverInstanceId: DriverInstanceId;
   execution: unknown;
   heartbeatIntervalMs: number;
@@ -39,7 +38,6 @@ export type RuntimeActionTokenPayload =
   | (RuntimeActionTokenPayloadBase & {
       action: "llm_proxy";
       projectId: ProjectId;
-      driverGeneration: number;
       imageModelId?: string;
       modelId: string;
       modelProtocol: PresetModelProtocol;
@@ -47,7 +45,6 @@ export type RuntimeActionTokenPayload =
     })
   | (RuntimeActionTokenPayloadBase & {
       action: "mcp_proxy";
-      driverGeneration: number;
       resourceId: McpServerId;
     })
   | (RuntimeActionTokenPayloadBase & {
@@ -167,13 +164,6 @@ export async function verifyRuntimeActionToken(
     throw new Error("Runtime action token has expired.");
   }
 
-  if (
-    payload.action === "mcp_proxy" &&
-    (!Number.isSafeInteger(payload.driverGeneration) || payload.driverGeneration < 0)
-  ) {
-    throw new Error("MCP proxy grant driver generation is invalid.");
-  }
-
   return payload;
 }
 
@@ -182,7 +172,6 @@ export function createDriverBootPayload(input: CreateBootPayloadInput): DriverBo
     bootToken: input.bootToken,
     controlUrl: input.controlUrl,
     driverControlPort: input.driverControlPort,
-    driverGeneration: input.driverGeneration,
     driverInstanceId: input.driverInstanceId,
     execution: input.execution,
     heartbeatIntervalMs: input.heartbeatIntervalMs,

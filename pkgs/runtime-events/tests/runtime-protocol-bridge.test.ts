@@ -37,6 +37,54 @@ function envelope(kind: string, payload: unknown, fields: Record<string, unknown
 }
 
 describe("Driver protocol projection bridge", () => {
+  test("recovers corrected reasoning from durable chunks without delivered previews", () => {
+    const events = [
+      envelope(
+        "thought.delta",
+        { thoughtId: "thought-1", contentDelta: "old\n\n" },
+        { delivery: "best_effort" },
+      ),
+      envelope("thought.updated", { thoughtId: "thought-1", content: "New😀", offset: 0 }),
+      envelope(
+        "thought.delta",
+        { thoughtId: "thought-1", contentDelta: "late" },
+        { delivery: "best_effort" },
+      ),
+      envelope("thought.updated", {
+        thoughtId: "thought-1",
+        content: " final",
+        offset: "New😀".length,
+      }),
+      envelope("thought.cancelled", { thoughtId: "thought-1" }),
+    ].map(parseRuntimeEventEnvelope);
+    const projected = events.flatMap(projectRuntimeEventToAgUiSessionEvents);
+    const initial = createInitialSessionLiveState({
+      sessionId: PLATFORM_ID_FIXTURES.session,
+      title: null,
+      viewerId: "viewer",
+    });
+    const live = applyAgUiEventsToSessionLiveState(initial, projected);
+    const recovered = applyAgUiEventsToSessionLiveState(
+      initial,
+      events
+        .filter((event) => event.kind !== "thought.delta")
+        .flatMap(projectRuntimeEventToAgUiSessionEvents),
+    );
+    expect(live.messages.map((message) => message.segments)).toEqual([
+      [{ kind: "reasoning", status: "completed", text: "New😀 final" }],
+    ]);
+    expect(recovered.messages.map((message) => message.segments)).toEqual(
+      live.messages.map((message) => message.segments),
+    );
+    expect(
+      createProcessDraftFromRuntimeEvent(
+        parseRuntimeEventEnvelope(
+          envelope("thought.updated", { thoughtId: "thought-2", content: "", offset: 0 }),
+        ),
+      ),
+    ).toEqual({ content: "", type: "agent.thinking.delta" });
+  });
+
   test.each(["2026-05-26", "2026-08-29"])("rejects %s as live traffic", (schemaVersion) => {
     expect(() =>
       parseRuntimeEventEnvelope(envelope("run.completed", { checkpoint }, { schemaVersion })),

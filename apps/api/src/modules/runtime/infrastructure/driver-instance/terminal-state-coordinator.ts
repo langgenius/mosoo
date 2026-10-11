@@ -53,7 +53,6 @@ export class DriverInstanceTerminalStateCoordinator {
           closeReason: close.reason || null,
           connectionId,
           errorMessage: this.#state.errorMessage,
-          generation: this.#state.requireDriverGeneration(),
           heartbeatCount: this.#state.heartbeatCount,
           lastHeartbeatAt: this.#state.lastHeartbeat?.at ?? null,
           status,
@@ -66,12 +65,11 @@ export class DriverInstanceTerminalStateCoordinator {
         ? await getTerminalDriverInstanceStatusForConnection(this.#env, {
             driverInstanceId,
             connectionId,
-            generation: this.#state.requireDriverGeneration(),
           })
         : null;
 
     // A prior attempt may have committed the driver row and stopped before the
-    // run/effect/lease repair. Only the same connection and generation may retry.
+    // run/effect/lease repair. Only the same connection may retry.
     if (terminalStatus !== null) {
       await this.#repairFinalizedRunState({
         driverInstanceId,

@@ -240,7 +240,6 @@ export class DriverInstance extends DurableObject {
       bootTokenHash,
       connectionId,
       driverInstanceId: this.#state.requireDriverInstanceId(),
-      generation: claim.generation,
     });
 
     if (!connected) {
@@ -257,7 +256,6 @@ export class DriverInstance extends DurableObject {
 
     await this.#state.recordAcceptedConnection({
       connectionId,
-      driverGeneration: claim.generation,
       traceId: parsedTraceparent?.traceId ?? null,
     });
 

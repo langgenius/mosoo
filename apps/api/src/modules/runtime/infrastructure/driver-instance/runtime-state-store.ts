@@ -10,7 +10,6 @@ export const DRIVER_FINALIZATION_RETRY_MS = 5_000;
 export interface DriverInstanceStoredState {
   close: DriverInstanceCloseSnapshot | null;
   connectionId: string | null;
-  driverGeneration: number | null;
   driverInstanceId: DriverInstanceId | null;
   errorMessage: string | null;
   finalizationCompleted: boolean;
@@ -37,7 +36,6 @@ export function createEmptyStoredState(): DriverInstanceStoredState {
   return {
     close: null,
     connectionId: null,
-    driverGeneration: null,
     driverInstanceId: null,
     errorMessage: null,
     finalizationCompleted: false,

@@ -20,7 +20,6 @@ export async function markDriverInstanceConnected(
     bootTokenHash: Uint8Array;
     connectionId: string;
     driverInstanceId: DriverInstanceId;
-    generation: number;
   },
 ): Promise<boolean> {
   const row =
@@ -34,7 +33,6 @@ export async function markDriverInstanceConnected(
         and(
           eq(driverInstancesTable.id, input.driverInstanceId),
           eq(driverInstancesTable.bootTokenHash, input.bootTokenHash),
-          eq(driverInstancesTable.generation, input.generation),
           eq(driverInstancesTable.status, "connecting"),
         ),
       )
@@ -49,7 +47,6 @@ export async function recordDriverInstanceHello(
   input: {
     connectionId: string;
     driverInstanceId: DriverInstanceId;
-    generation: number;
     hello: DriverHelloInput;
   },
 ): Promise<boolean> {
@@ -69,7 +66,6 @@ export async function recordDriverInstanceHello(
         and(
           eq(driverInstancesTable.id, input.driverInstanceId),
           eq(driverInstancesTable.connectionId, input.connectionId),
-          eq(driverInstancesTable.generation, input.generation),
           eq(driverInstancesTable.status, "connecting"),
         ),
       )
@@ -84,7 +80,6 @@ export async function markDriverInstanceReady(
   input: Omit<DriverReadyInput, "driverInstanceId"> & {
     connectionId: string;
     driverInstanceId: DriverInstanceId;
-    generation: number;
   },
 ): Promise<boolean> {
   const now = currentTimestampMs();
@@ -105,7 +100,6 @@ export async function markDriverInstanceReady(
         and(
           eq(driverInstancesTable.id, input.driverInstanceId),
           eq(driverInstancesTable.connectionId, input.connectionId),
-          eq(driverInstancesTable.generation, input.generation),
           eq(driverInstancesTable.status, "connecting"),
         ),
       )
@@ -120,7 +114,6 @@ export async function recordDriverInstanceHeartbeat(
   input: {
     connectionId: string;
     driverInstanceId: DriverInstanceId;
-    generation: number;
     heartbeat: DriverHeartbeatInput;
     heartbeatCount: number;
   },
@@ -139,7 +132,6 @@ export async function recordDriverInstanceHeartbeat(
         and(
           eq(driverInstancesTable.id, input.driverInstanceId),
           eq(driverInstancesTable.connectionId, input.connectionId),
-          eq(driverInstancesTable.generation, input.generation),
           inArray(driverInstancesTable.status, ["connecting", "ready"]),
         ),
       )
@@ -157,7 +149,6 @@ export async function finalizeDriverInstance(
     closeReason?: string | null;
     connectionId: string;
     errorMessage?: string | null;
-    generation: number;
     heartbeatCount: number;
     lastHeartbeatAt?: string | null;
     status: Extract<DriverInstanceStatus, "stopped" | "failed">;
@@ -191,7 +182,6 @@ export async function finalizeDriverInstance(
         and(
           eq(driverInstancesTable.id, driverInstanceId),
           eq(driverInstancesTable.connectionId, input.connectionId),
-          eq(driverInstancesTable.generation, input.generation),
           inArray(driverInstancesTable.status, LIVE_DRIVER_INSTANCE_STATUSES),
         ),
       )
@@ -218,7 +208,7 @@ export async function getDriverInstanceStatus(
 
 export async function getTerminalDriverInstanceStatusForConnection(
   bindings: ApiBindings,
-  input: { driverInstanceId: DriverInstanceId; connectionId: string; generation: number },
+  input: { driverInstanceId: DriverInstanceId; connectionId: string },
 ): Promise<"failed" | "stopped" | null> {
   const row = await getAppDatabase(bindings.DB)
     .select({ status: driverInstancesTable.status })
@@ -227,7 +217,6 @@ export async function getTerminalDriverInstanceStatusForConnection(
       and(
         eq(driverInstancesTable.id, input.driverInstanceId),
         eq(driverInstancesTable.connectionId, input.connectionId),
-        eq(driverInstancesTable.generation, input.generation),
       ),
     )
     .get();

@@ -29,12 +29,12 @@ describe("runtime model protocol resolution", () => {
     }
   });
 
-  test("keeps mixed protocols within one provider and different protocols for the same model name", () => {
+  test("resolves each provider's protocol, including native Gemini", () => {
     const cases = [
       ["opencode", "deepseek-v4-pro", "openai-chat-completions"],
       ["opencode", "qwen3.6-plus", "anthropic-messages"],
       ["opencode", "gemini-3.5-flash", "google-gemini"],
-      ["gemini", "gemini-3.5-flash", "openai-chat-completions"],
+      ["gemini", "gemini-3.5-flash", "google-gemini"],
     ] as const;
     for (const [vendorId, modelId, modelProtocol] of cases) {
       expect(resolveRuntimeModelProtocol({ runtimeId: "pi", vendorId, modelId })).toEqual({

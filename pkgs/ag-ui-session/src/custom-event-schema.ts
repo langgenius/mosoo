@@ -31,6 +31,15 @@ const MosooSessionFilesUpdatedValueSchema = type({
 
 export const MosooCustomEventSchema = type.or(
   type({
+    name: eventNameLiteral(MOSOO_CUSTOM_EVENT.sessionReasoningUpdated.name),
+    type: '"CUSTOM"',
+    value: {
+      content: "string",
+      messageId: "string > 0",
+      offset: type("number.safe").and("number.integer >= 0"),
+    },
+  }),
+  type({
     name: eventNameLiteral(MOSOO_CUSTOM_EVENT.sessionToolInputUpdated.name),
     type: '"CUSTOM"',
     value: {

@@ -18,6 +18,7 @@ import type {
   MosooSessionModeUpdatedValue,
   MosooSessionPermissionsUpdatedValue,
   MosooSessionPlanUpdatedValue,
+  MosooSessionReasoningUpdatedValue,
   MosooSessionRunUpdatedValue,
   MosooSessionStoppedValue,
   MosooSessionToolInputUpdatedValue,
@@ -67,6 +68,7 @@ export interface MosooCustomEventValueByName {
   [CUSTOM_EVENT_REGISTRY.sessionModeUpdated.name]: MosooSessionModeUpdatedValue;
   [CUSTOM_EVENT_REGISTRY.sessionPermissionsUpdated.name]: MosooSessionPermissionsUpdatedValue;
   [CUSTOM_EVENT_REGISTRY.sessionPlanUpdated.name]: MosooSessionPlanUpdatedValue;
+  [CUSTOM_EVENT_REGISTRY.sessionReasoningUpdated.name]: MosooSessionReasoningUpdatedValue;
   [CUSTOM_EVENT_REGISTRY.sessionRunUpdated.name]: MosooSessionRunUpdatedValue;
   [CUSTOM_EVENT_REGISTRY.sessionStopped.name]: MosooSessionStoppedValue;
   [CUSTOM_EVENT_REGISTRY.sessionToolInputUpdated.name]: MosooSessionToolInputUpdatedValue;

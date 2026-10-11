@@ -1,12 +1,19 @@
 import type { RuntimeEventId, SessionRunId } from "@mosoo/id";
+import {
+  isRuntimeEventRecord,
+  parseRuntimeEventEnvelope,
+  readRuntimeEventString,
+  readRuntimeEventThoughtUpdate,
+} from "@mosoo/runtime-events";
 
 // Streamed text events (message.delta / thought.delta) are persisted one row
 // per fragment so every accepted source identity stays durable (#274). Reading
 // them back verbatim renders each fragment as its own timeline entry, so read
 // paths fold a fragment stream into a single row before projecting process
-// events: deltas append, snapshots prefer the longer prefix-matching text.
+// events: message deltas append, snapshots prefer the longer prefix-matching
+// text; thoughts use canonical identity and offsets to replace previews.
 //
-// Rows carry no message identity, so a stream whose driver-side identity
+// Message folding groups by process type, so a stream whose driver-side identity
 // fractured (a dropped message_start splits one reply across several
 // started/delta groups, YEF-884) still folds into several fragment rows, and
 // the trailing message.added snapshot lands after its stream already closed.
@@ -15,6 +22,7 @@ import type { RuntimeEventId, SessionRunId } from "@mosoo/id";
 // them with a single row instead of rendering a duplicate.
 
 export interface StreamFoldableSessionEventRow {
+  canonical_event_json: string | null;
   content_text: string;
   ended_at: number;
   event_type: string;
@@ -24,6 +32,34 @@ export interface StreamFoldableSessionEventRow {
   run_id: SessionRunId | null;
   seq: number;
   tokens: number | null;
+}
+
+export interface StoredThoughtEvent {
+  content: string;
+  offset: number | null;
+  thoughtId: string;
+}
+
+export function readStoredThoughtEvent(
+  row: Pick<StreamFoldableSessionEventRow, "canonical_event_json" | "event_type" | "id">,
+): StoredThoughtEvent | null {
+  if (!row.event_type.startsWith("thought.") || row.canonical_event_json === null) {
+    return null;
+  }
+  const persisted: unknown = JSON.parse(row.canonical_event_json);
+  if (row.event_type === "thought.updated") {
+    return readRuntimeEventThoughtUpdate(parseRuntimeEventEnvelope(persisted));
+  }
+  // Persisted lifecycle events retain their original schema version.
+  const payload = isRuntimeEventRecord(persisted) ? persisted["payload"] : undefined;
+  return {
+    content:
+      readRuntimeEventString(payload, "contentDelta") ??
+      readRuntimeEventString(payload, "content") ??
+      "",
+    offset: null,
+    thoughtId: readRuntimeEventString(payload, "thoughtId") ?? row.id,
+  };
 }
 
 type StreamRowPhase = "added" | "completed" | "delta" | "started";
@@ -60,6 +96,15 @@ interface OpenStreamGroup<R extends StreamFoldableSessionEventRow> {
 
 interface ClosedFragmentSegment {
   content: string;
+  outputIndex: number;
+}
+
+interface ThoughtStreamGroup<R extends StreamFoldableSessionEventRow> {
+  anchor: R;
+  canonical: boolean;
+  closed: boolean;
+  content: string;
+  nextOffset: number | null;
   outputIndex: number;
 }
 
@@ -154,6 +199,7 @@ export function foldStreamedSessionEventRows<R extends StreamFoldableSessionEven
   const output: (R | null)[] = [];
   const openGroups = new Map<string, OpenStreamGroup<R>>();
   const fragmentSegments = new Map<string, ClosedFragmentSegment[]>();
+  const thoughts = new Map<string, ThoughtStreamGroup<R>>();
 
   function closeGroupAsFragment(key: string, group: OpenStreamGroup<R>): void {
     const folded = createFoldedStreamRow(group);
@@ -208,6 +254,61 @@ export function foldStreamedSessionEventRows<R extends StreamFoldableSessionEven
   }
 
   for (const row of rows) {
+    const storedThought = readStoredThoughtEvent(row);
+    if (storedThought !== null) {
+      const key = JSON.stringify([row.run_id, storedThought.thoughtId]);
+      let thought = thoughts.get(key);
+
+      if (thought === undefined) {
+        thought = {
+          anchor: row,
+          canonical: false,
+          closed: false,
+          content: "",
+          nextOffset: null,
+          outputIndex: output.length,
+        };
+        thoughts.set(key, thought);
+        output.push(null);
+      }
+
+      if (storedThought.offset !== null) {
+        const update = storedThought;
+        thought.canonical = true;
+        if (update.offset === 0) {
+          thought.content = update.content;
+          thought.nextOffset = update.content.length;
+        } else if (thought.nextOffset === null) {
+          // A bounded history window cannot reconstruct a missing first chunk.
+          thought.content = "";
+        } else {
+          if (update.offset !== thought.nextOffset) {
+            throw new Error("Persisted thought content chunks are not contiguous.");
+          }
+          thought.content += update.content;
+          thought.nextOffset += update.content.length;
+        }
+      } else if (row.event_type === "thought.delta") {
+        if (thought.canonical || thought.closed) {
+          continue;
+        }
+        thought.content += storedThought.content;
+      } else if (row.event_type === "thought.completed" || row.event_type === "thought.cancelled") {
+        thought.closed = true;
+      }
+
+      output[thought.outputIndex] =
+        thought.content.length === 0
+          ? null
+          : {
+              ...row,
+              content_text: thought.content,
+              occurred_at: thought.anchor.occurred_at,
+              seq: thought.anchor.seq,
+            };
+      continue;
+    }
+
     const classification = streamRowClassifications[row.event_type];
 
     if (classification === undefined) {

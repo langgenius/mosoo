@@ -16,6 +16,7 @@ import {
   readRuntimeRunPayload,
   readRuntimeEventString,
   readRuntimeEventToolCallUpdate,
+  readRuntimeEventThoughtUpdate,
   toRuntimeRunLifecycleStatus,
 } from "./runtime-event-payload";
 
@@ -257,6 +258,16 @@ export function projectRuntimeEventToAgUiSessionEvents(
           messageId: readRuntimeEventMessageKey(event) ?? event.id,
           type: EventType.REASONING_MESSAGE_CONTENT,
         },
+      ];
+    }
+    case "thought.updated": {
+      const update = readRuntimeEventThoughtUpdate(event);
+      return [
+        createServerCustomEvent(MOSOO_CUSTOM_EVENT.sessionReasoningUpdated.name, {
+          content: update.content,
+          messageId: update.thoughtId,
+          offset: update.offset,
+        }),
       ];
     }
     case "thought.cancelled":

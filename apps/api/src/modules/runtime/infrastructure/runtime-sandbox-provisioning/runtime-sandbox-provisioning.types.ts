@@ -17,7 +17,6 @@ import type {
 
 export interface RuntimeSmokeProvision {
   bootTokenHash: Uint8Array;
-  driverGeneration: number;
   driverInstanceId: DriverInstanceId;
   timing: RuntimeTimingSnapshot;
   process: RuntimeProcessHandle;

@@ -175,7 +175,11 @@ describe("session live-state transcript reducer", () => {
     expect(nextState.messages[0]?.role).toBe("assistant");
     expect(nextState.messages[0]?.content).toBe("");
     expect(nextState.messages[0]?.segments).toEqual([
-      { kind: "reasoning", text: "The user asks about MCP. Check the configured servers." },
+      {
+        kind: "reasoning",
+        status: "completed",
+        text: "The user asks about MCP. Check the configured servers.",
+      },
     ]);
   });
 
@@ -185,7 +189,9 @@ describe("session live-state transcript reducer", () => {
     ]);
 
     expect(nextState.messages).toHaveLength(1);
-    expect(nextState.messages[0]?.segments).toEqual([{ kind: "reasoning", text: "" }]);
+    expect(nextState.messages[0]?.segments).toEqual([
+      { kind: "reasoning", status: "streaming", text: "" },
+    ]);
   });
 
   test("keeps reasoning separate from assistant text in the same turn", () => {
@@ -199,9 +205,74 @@ describe("session live-state transcript reducer", () => {
     ]);
 
     expect(nextState.messages).toHaveLength(2);
-    expect(nextState.messages[0]?.segments).toEqual([{ kind: "reasoning", text: "thinking..." }]);
+    expect(nextState.messages[0]?.segments).toEqual([
+      { kind: "reasoning", status: "completed", text: "thinking..." },
+    ]);
     expect(nextState.messages[1]?.segments).toEqual([{ kind: "text", text: "Answer." }]);
     expect(nextState.messages[1]?.content).toBe("Answer.");
+  });
+
+  test("replaces reasoning previews with complete chunks and ignores replayed previews", () => {
+    const chunk = (messageId: string, content: string, offset = 0) =>
+      parseServerCustomEvent(MOSOO_CUSTOM_EVENT.sessionReasoningUpdated.name, {
+        content,
+        messageId,
+        offset,
+      });
+    const partial = applyAgUiEventsToSessionLiveState(baseState(), [
+      {
+        delta: "Draft with trailing newline\n",
+        messageId: "thought-1",
+        type: "REASONING_MESSAGE_CONTENT",
+      },
+      chunk("thought-1", "Final😀"),
+      { delta: "late preview", messageId: "thought-1", type: "REASONING_MESSAGE_CONTENT" },
+      chunk("thought-2", ""),
+      chunk("thought-1", "正文", "Final😀".length),
+      { messageId: "thought-1", type: "REASONING_MESSAGE_END" },
+      { messageId: "thought-2", type: "REASONING_MESSAGE_END" },
+    ]);
+    expect(partial.messages.map((message) => message.segments)).toEqual([
+      [{ kind: "reasoning", status: "completed", text: "Final😀正文" }],
+      [{ kind: "reasoning", status: "completed", text: "" }],
+    ]);
+
+    const replayed = applyAgUiEventsToSessionLiveState(baseState(), [
+      { type: "STATE_SNAPSHOT", snapshot: partial },
+      { messageId: "thought-1", role: "reasoning", type: "REASONING_MESSAGE_START" },
+      chunk("thought-1", "Final😀"),
+      chunk("thought-1", "正文", "Final😀".length),
+      chunk("thought-2", ""),
+      {
+        delta: "late after empty final",
+        messageId: "thought-2",
+        type: "REASONING_MESSAGE_CONTENT",
+      },
+      { messageId: "thought-1", type: "REASONING_MESSAGE_END" },
+    ]);
+    expect(replayed.messages).toEqual(partial.messages);
+  });
+
+  test("rejects incomplete or changed reasoning snapshots", () => {
+    const chunk = (content: string, offset = 0) =>
+      parseServerCustomEvent(MOSOO_CUSTOM_EVENT.sessionReasoningUpdated.name, {
+        content,
+        messageId: "thought-1",
+        offset,
+      });
+    expect(() => applyAgUiEventsToSessionLiveState(baseState(), [chunk("suffix", 1)])).toThrow(
+      "offset zero",
+    );
+    const partial = applyAgUiEventsToSessionLiveState(baseState(), [chunk("first")]);
+    for (const invalid of [chunk("changed"), chunk("gap", 6)]) {
+      expect(() => applyAgUiEventsToSessionLiveState(partial, [invalid])).toThrow("contiguous");
+    }
+    const completed = applyAgUiEventsToSessionLiveState(partial, [
+      { messageId: "thought-1", type: "REASONING_MESSAGE_END" },
+    ]);
+    expect(() => applyAgUiEventsToSessionLiveState(completed, [chunk("late", 5)])).toThrow(
+      "immutable",
+    );
   });
 
   test("does not merge streamed text across intervening transcript events", () => {

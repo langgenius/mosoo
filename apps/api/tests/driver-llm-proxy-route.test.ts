@@ -9,14 +9,16 @@ import { Hono } from "hono";
 
 import { registerDriverRoute } from "../src/adapters/http/routes/driver-route";
 import { getRuntimeDriverLlmProxyPath } from "../src/modules/runtime/domain/runtime-driver-routes";
+import { finalizeDriverInstance } from "../src/modules/runtime/infrastructure/driver-instance/lifecycle";
 import { createRuntimeActionToken } from "../src/modules/runtime/infrastructure/runtime-boot-token";
 import type { RuntimeActionTokenPayload } from "../src/modules/runtime/infrastructure/runtime-boot-token";
-import { buildVendorProxyEnvVars } from "../src/modules/runtime/infrastructure/runtime-sandbox-provisioning/runtime-vendor-proxy-env.builder";
+import { buildModelConnection } from "../src/modules/runtime/infrastructure/runtime-sandbox-provisioning/runtime-model-connection.builder";
 import { storeSecret } from "../src/modules/vault/application/vault-secret-store";
 import { runWithRequestLogContext } from "../src/platform/cloudflare/logger";
 import type { ApiBindings, ApiGatewayEnvironment } from "../src/platform/cloudflare/worker-types";
 import {
   PI_PROXY_FINAL_TEXT,
+  PI_PROXY_THOUGHT_SIGNATURE,
   PI_PROXY_TOOL_PROOF,
   piProxyProtocolResponse,
   runOpenCodeProxyTurn,
@@ -104,7 +106,6 @@ async function insertDriverInstance(
   input: {
     bootTokenExpiresAt?: number;
     driverInstanceId?: DriverInstanceId;
-    generation?: number;
     lastHeartbeatAt?: number | null;
     sandboxSessionId?: string;
     updatedAt?: number;
@@ -121,14 +122,13 @@ async function insertDriverInstance(
       bootTokenUsedAt: null,
       closeCode: null,
       closeReason: null,
-      connectionId: null,
+      connectionId: `llm-proxy-${driverInstanceId}`,
       createdAt: nowMs,
       driverPid: null,
       driverStartedAt: null,
       driverVersion: null,
       errorMessage: null,
       expiresAt: nowMs + 60_000,
-      generation: input.generation ?? 0,
       heartbeatCount: 0,
       id: driverInstanceId,
       lastHeartbeatAt: input.lastHeartbeatAt ?? null,
@@ -189,7 +189,6 @@ async function createLlmProxyGrant(
   return createRuntimeActionToken(bindings, {
     action: "llm_proxy",
     projectId: PROJECT_ID,
-    driverGeneration: 0,
     driverInstanceId: DRIVER_INSTANCE_ID,
     expiresAt: Date.now() + 60_000,
     modelId: "claude-sonnet-5",
@@ -212,7 +211,6 @@ function llmProxyRequest(
 
 async function setupFixture(input?: {
   apiBase?: string | null;
-  driverGeneration?: number;
   driverStatus?: "provisioning" | "connecting" | "ready" | "failed" | "absent";
   driverUpdatedAt?: number;
   modelProtocol?: PresetModelProtocol | null;
@@ -223,7 +221,6 @@ async function setupFixture(input?: {
 
   if (input?.driverStatus !== "absent") {
     await insertDriverInstance(database, input?.driverStatus ?? "ready", {
-      generation: input?.driverGeneration,
       updatedAt: input?.driverUpdatedAt,
     });
   }
@@ -302,9 +299,8 @@ describe("driver LLM proxy route", () => {
         fetch: (request) => dispatch(bindings, request),
       });
       try {
-        const env = await buildVendorProxyEnvVars({
+        const connection = await buildModelConnection({
           bindings,
-          driverGeneration: 0,
           driverInstanceId: DRIVER_INSTANCE_ID,
           profile: {
             model: "pi-test",
@@ -322,8 +318,8 @@ describe("driver LLM proxy route", () => {
           requestUrl: `http://127.0.0.1:${proxy.port}/api/sessions`,
         });
         const events = await (runtimeId === "pi"
-          ? runPiProxyTurn(env, { provider: "openai-compatible", model: "pi-test" })
-          : runOpenCodeProxyTurn(env));
+          ? runPiProxyTurn(connection, { provider: "openai-compatible", model: "pi-test" })
+          : runOpenCodeProxyTurn(connection));
         expect(modelCalls).toBe(2);
         if (runtimeId === "pi") {
           expect(
@@ -367,8 +363,7 @@ describe("driver LLM proxy route", () => {
           ).toBe(true);
         }
         expect(captured[1]?.body).toContain(PI_PROXY_TOOL_PROOF);
-        const grant =
-          env[runtimeId === "pi" ? "MOSOO_PI_PROXY_GRANT" : "OPENAI_COMPATIBLE_API_KEY"];
+        const grant = connection.proxyGrant;
         for (const request of captured) {
           expect(new URL(request.url).pathname).toBe(path);
           expect(request.headers.get(header)).toBe(value);
@@ -409,6 +404,12 @@ describe("driver LLM proxy route", () => {
       protocol: "google-gemini",
       provider: "opencode",
     },
+    {
+      vendorId: "gemini",
+      model: "gemini-3.5-flash",
+      protocol: "google-gemini",
+      provider: "google",
+    },
   ] satisfies {
     vendorId: string;
     model: string;
@@ -428,9 +429,8 @@ describe("driver LLM proxy route", () => {
         fetch: (request) => dispatch(bindings, request),
       });
       try {
-        const env = await buildVendorProxyEnvVars({
+        const connection = await buildModelConnection({
           bindings,
-          driverGeneration: 0,
           driverInstanceId: DRIVER_INSTANCE_ID,
           profile: {
             model,
@@ -444,7 +444,7 @@ describe("driver LLM proxy route", () => {
           },
           requestUrl: `http://127.0.0.1:${proxy.port}/api/sessions`,
         });
-        const events = await runPiProxyTurn(env, {
+        const events = await runPiProxyTurn(connection, {
           provider: vendorId,
           model,
           thinkingLevel: "high",
@@ -487,6 +487,23 @@ describe("driver LLM proxy route", () => {
           expect(body).toMatchObject({
             generationConfig: { thinkingConfig: { thinkingLevel: "HIGH", includeThoughts: true } },
           });
+          const continuation = JSON.parse(captured[1]?.body ?? "{}");
+          const toolCall = continuation.contents
+            .find((entry: { role: string }) => entry.role === "model")
+            .parts.find((part: { functionCall?: unknown }) => part.functionCall);
+          expect(toolCall).toMatchObject({
+            functionCall: { name: "bash" },
+            thoughtSignature: PI_PROXY_THOUGHT_SIGNATURE,
+          });
+          if (vendorId === "gemini") {
+            for (const request of captured) {
+              expect(request.url).toBe(
+                `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`,
+              );
+              expect(request.headers.get("x-goog-api-key")).toBe(UPSTREAM_API_KEY);
+              expect(request.headers.has("authorization")).toBe(false);
+            }
+          }
         }
       } finally {
         await proxy.stop(true);
@@ -615,7 +632,6 @@ describe("driver LLM proxy route", () => {
         });
         expect(entry.metadata).toEqual({
           credentialId: CREDENTIAL_ID,
-          driverGeneration: 0,
           driverInstanceId: DRIVER_INSTANCE_ID,
           modelProtocol: "openai-chat-completions",
           projectId: PROJECT_ID,
@@ -1065,7 +1081,6 @@ describe("driver LLM proxy route", () => {
     const captured = captureUpstreamFetch();
     const grant = await createRuntimeActionToken(bindings, {
       action: "mcp_proxy",
-      driverGeneration: 0,
       driverInstanceId: DRIVER_INSTANCE_ID,
       expiresAt: Date.now() + 60_000,
       resourceId: parsePlatformId("01J0000000000000000000000G", "server id"),
@@ -1155,10 +1170,21 @@ describe("driver LLM proxy route", () => {
     expect(captured).toHaveLength(0);
   });
 
-  test("rejects grants minted for a stale driver generation", async () => {
-    const { bindings } = await setupFixture({ driverGeneration: 2 });
+  test("rejects the stopped instance's grant after a replacement instance becomes ready", async () => {
+    const { bindings, database } = await setupFixture();
     const captured = captureUpstreamFetch();
-    const grant = await createLlmProxyGrant(bindings, { driverGeneration: 1 });
+    const grant = await createLlmProxyGrant(bindings);
+    expect(
+      await finalizeDriverInstance(bindings, DRIVER_INSTANCE_ID, {
+        connectionId: `llm-proxy-${DRIVER_INSTANCE_ID}`,
+        heartbeatCount: 0,
+        status: "stopped",
+      }),
+    ).toBe(true);
+    await insertDriverInstance(database, "ready", { driverInstanceId: OTHER_DRIVER_INSTANCE_ID });
+    const replacementGrant = await createLlmProxyGrant(bindings, {
+      driverInstanceId: OTHER_DRIVER_INSTANCE_ID,
+    });
 
     const response = await dispatch(
       bindings,
@@ -1170,6 +1196,18 @@ describe("driver LLM proxy route", () => {
 
     expect(response.status).toBe(403);
     expect(captured).toHaveLength(0);
+
+    const replacementResponse = await dispatch(
+      bindings,
+      llmProxyRequest("/v1/messages", {
+        body: JSON.stringify({ model: "claude-sonnet-5" }),
+        headers: { "x-api-key": replacementGrant },
+        method: "POST",
+      }),
+    );
+
+    expect(replacementResponse.status).toBe(200);
+    expect(captured).toHaveLength(1);
   });
 
   test("rejects grants whose project does not own the credential", async () => {

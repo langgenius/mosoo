@@ -14,6 +14,7 @@ import {
   readRuntimeTimingPayload,
   readRuntimeEventToolCallUpdate,
   readRuntimeEventToolStatusFromEvent,
+  readRuntimeEventThoughtUpdate,
 } from "./runtime-event-payload";
 
 export type ProcessDraftType = SessionProcessEventType;
@@ -49,6 +50,12 @@ export function createProcessDraftFromRuntimeEvent(event: RuntimeEventEnvelope):
     case "plan.updated": {
       return {
         content: readRuntimeEventMessageDelta(event) || "Agent thinking updated.",
+        type: "agent.thinking.delta",
+      };
+    }
+    case "thought.updated": {
+      return {
+        content: readRuntimeEventThoughtUpdate(event).content,
         type: "agent.thinking.delta",
       };
     }

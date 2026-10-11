@@ -19,8 +19,8 @@ describe("vendor credential probe", () => {
       "https://api.example.com/v1/chat/completions",
     );
     expect(
-      toVendorProbeEndpointUrl("https://generativelanguage.googleapis.com/v1beta/openai", "models"),
-    ).toBe("https://generativelanguage.googleapis.com/v1beta/openai/models");
+      toVendorProbeEndpointUrl("https://generativelanguage.googleapis.com/v1beta", "models"),
+    ).toBe("https://generativelanguage.googleapis.com/v1beta/models");
     expect(toVendorProbeEndpointUrl("https://api.z.ai/api/paas/v4", "models")).toBe(
       "https://api.z.ai/api/paas/v4/models",
     );
@@ -101,6 +101,47 @@ describe("vendor credential probe", () => {
       vendorProbeModelListIncludes({ models: [{ name: "models/model-a" }] }, "models/model-a"),
     ).toBe(true);
   });
+
+  test.each([false, true])(
+    "probes the Gemini preset with native endpoint and auth (verify model: %s)",
+    async (verifyModelProtocol) => {
+      const originalFetch = globalThis.fetch;
+      const requests: Request[] = [];
+      globalThis.fetch = async (url, init) => {
+        requests.push(new Request(url, init));
+        return Response.json(
+          verifyModelProtocol
+            ? { candidates: [{ content: { parts: [{ text: "pong" }], role: "model" } }] }
+            : { models: [{ name: "models/gemini-3.5-flash" }] },
+        );
+      };
+      try {
+        expect(
+          await probeVendorCredential({
+            apiKey: "probe-key",
+            modelId: "gemini-3.5-flash",
+            vendorId: "gemini",
+            verifyModelProtocol,
+          }),
+        ).toMatchObject({ ok: true });
+        expect(requests).toHaveLength(1);
+        const request = requests[0];
+        expect(request.url).toBe(
+          `https://generativelanguage.googleapis.com/v1beta/models${verifyModelProtocol ? "/gemini-3.5-flash:generateContent" : ""}`,
+        );
+        expect(request.method).toBe(verifyModelProtocol ? "POST" : "GET");
+        expect(request.headers.get("x-goog-api-key")).toBe("probe-key");
+        expect(request.headers.has("authorization")).toBe(false);
+        if (verifyModelProtocol) {
+          expect(await request.json()).toMatchObject({
+            contents: [{ parts: [{ text: "ping" }], role: "user" }],
+          });
+        }
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    },
+  );
 
   const protocolCases: {
     protocol: PresetModelProtocol;

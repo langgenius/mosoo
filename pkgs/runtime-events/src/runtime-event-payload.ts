@@ -1,5 +1,8 @@
 import { parseNullableSessionUsageSummary } from "@mosoo/ag-ui-session";
-import type { RuntimeTimingPayload as DriverRuntimeTimingPayload } from "@mosoo/agent-driver/runtime-events";
+import type {
+  RuntimeThoughtUpdatedPayload,
+  RuntimeTimingPayload as DriverRuntimeTimingPayload,
+} from "@mosoo/agent-driver/runtime-events";
 import type { DriverInstanceId, SessionId, SessionRunId } from "@mosoo/id";
 
 import type { RuntimeEventEnvelope, RuntimeEventKind } from "./runtime-event";
@@ -182,6 +185,12 @@ export function readRuntimeEventToolCallUpdate(
   };
 }
 
+export function readRuntimeEventThoughtUpdate(
+  event: RuntimeEventEnvelope,
+): RuntimeThoughtUpdatedPayload {
+  return event.payload as RuntimeThoughtUpdatedPayload;
+}
+
 export function readRuntimeRunPayload(event: RuntimeEventEnvelope): RuntimeRunPayload {
   const payload = readRuntimeEventPayload(event);
 
@@ -226,6 +235,9 @@ export function readRuntimeEventMessageKey(event: RuntimeEventEnvelope): string 
     case "thought.delta":
     case "thought.started": {
       return readRuntimeEventString(payload, "thoughtId") ?? event.id;
+    }
+    case "thought.updated": {
+      return readRuntimeEventThoughtUpdate(event).thoughtId;
     }
     default: {
       return null;

@@ -24,7 +24,6 @@ export class DriverInstanceRuntimeState {
   close: DriverInstanceCloseSnapshot | null = null;
   readonly closeWaiters: PromiseDeferred<void>[] = [];
   connectionId: string | null = null;
-  driverGeneration: number | null = null;
   driverInstanceId: DriverInstanceId | null = null;
   errorMessage: string | null = null;
   finalizationCompleted = false;
@@ -46,7 +45,6 @@ export class DriverInstanceRuntimeState {
   #applyStoredState(snapshot: DriverInstanceStoredState): void {
     this.close = snapshot.close;
     this.connectionId = snapshot.connectionId;
-    this.driverGeneration = snapshot.driverGeneration;
     this.driverInstanceId = snapshot.driverInstanceId;
     this.errorMessage = snapshot.errorMessage;
     this.finalizationCompleted = snapshot.finalizationCompleted;
@@ -72,7 +70,6 @@ export class DriverInstanceRuntimeState {
       commandQueue: [],
       connectedAt: null,
       connectionId: this.connectionId,
-      driverGeneration: this.driverGeneration,
       driverInstanceId: this.driverInstanceId,
       errorMessage: this.errorMessage,
       finalizationCompleted: this.finalizationCompleted,
@@ -134,11 +131,9 @@ export class DriverInstanceRuntimeState {
 
   async recordAcceptedConnection(input: {
     connectionId: string;
-    driverGeneration: number;
     traceId: string | null;
   }): Promise<void> {
     this.connectionId = input.connectionId;
-    this.driverGeneration = input.driverGeneration;
 
     if (input.traceId !== null) {
       this.traceId = input.traceId;
@@ -187,14 +182,6 @@ export class DriverInstanceRuntimeState {
     }
 
     return this.connectionId;
-  }
-
-  requireDriverGeneration(): number {
-    if (this.driverGeneration === null) {
-      throw new Error("Driver generation was not initialized.");
-    }
-
-    return this.driverGeneration;
   }
 
   async resetForReuse(): Promise<void> {

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, spyOn, test } from "bun:test";
 
 import type { DriverEventEnvelope } from "@mosoo/agent-driver/events";
 import type { DriverEventReceipt } from "@mosoo/agent-driver/orpc";
+import { MAX_THOUGHT_CONTENT_BYTES } from "@mosoo/agent-driver/runtime-events";
 import { createPlatformId } from "@mosoo/id";
 import type {
   DriverInstanceId,
@@ -403,6 +404,95 @@ async function pushFreshController(
 }
 
 describe("runtime final output ingestion", () => {
+  test("rejects reasoning chunks whose combined body exceeds the content limit", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertRuntimeFixture(database);
+    const bindings = createPublicHttpTestBindings(database);
+    const content = "中".repeat(128 * 1024);
+    const contentBytes = new TextEncoder().encode(content).byteLength;
+    const events = Array.from(
+      { length: Math.floor(MAX_THOUGHT_CONTENT_BYTES / contentBytes) },
+      (_, index) =>
+        runtimeEvent({
+          kind: "thought.updated",
+          payload: { thoughtId: "thought-large", content, offset: index * content.length },
+          sourceEventId: `thought-large:${index}`,
+        }),
+    );
+    events.push(
+      runtimeEvent({
+        kind: "thought.updated",
+        payload: {
+          thoughtId: "thought-large",
+          content: "中".repeat(
+            Math.floor((MAX_THOUGHT_CONTENT_BYTES - events.length * contentBytes) / 3) + 1,
+          ),
+          offset: events.length * content.length,
+        },
+        sourceEventId: "thought-large:overflow",
+      }),
+    );
+    await expect(pushFreshController(bindings, events)).rejects.toThrow("content byte limit");
+    expect(
+      await database
+        .prepare("SELECT COUNT(*) AS count FROM session_event WHERE event_type = 'thought.updated'")
+        .first(),
+    ).toEqual({ count: 0 });
+  });
+
+  test("commits corrected reasoning snapshots across controller restarts and duplicate chunks", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertRuntimeFixture(database);
+    const bindings = createPublicHttpTestBindings(database);
+    const thought = (
+      kind: RuntimeEventKind,
+      payload: Record<string, unknown>,
+      sourceEventId: string,
+    ) =>
+      runtimeEvent({
+        kind,
+        payload: { thoughtId: "thought-1", ...payload },
+        sourceEventId,
+      });
+    const preview = thought(
+      "thought.delta",
+      { contentDelta: "unconfirmed\n\n" },
+      "thought:preview",
+    );
+    const first = thought("thought.updated", { content: "Final😀", offset: 0 }, "thought:first");
+    const second = thought(
+      "thought.updated",
+      { content: "正文", offset: "Final😀".length },
+      "thought:second",
+    );
+    await pushFreshController(bindings, [preview]);
+    const firstReceipt = await pushFreshController(bindings, [first]);
+    expect(await pushFreshController(bindings, [first])).toEqual(firstReceipt);
+    await expect(
+      pushFreshController(bindings, [
+        thought("thought.updated", { content: "gap", offset: 50 }, "thought:gap"),
+      ]),
+    ).rejects.toThrow("contiguous");
+    await pushFreshController(bindings, [second]);
+    await pushFreshController(bindings, [
+      thought("thought.cancelled", {}, "thought:cancelled"),
+      thought("thought.delta", { contentDelta: "late preview" }, "thought:late-preview"),
+    ]);
+
+    const state = await loadSessionViewerState(database, {
+      sessionId: SESSION_ID,
+      viewerId: PUBLIC_API_TEST_IDS.ownerAccount,
+    });
+    expect(state.messages.find((message) => message.id === "thought-1")?.segments).toEqual([
+      { kind: "reasoning", status: "completed", text: "Final😀正文" },
+    ]);
+    expect(
+      await database
+        .prepare("SELECT COUNT(*) AS count FROM session_event WHERE event_type = 'thought.updated'")
+        .first(),
+    ).toEqual({ count: 2 });
+  });
+
   test.each([
     undefined,
     { ...CHECKPOINT, formatVersion: 2 },
@@ -1174,7 +1264,7 @@ describe("runtime final output ingestion", () => {
 
       const rows = await database
         .prepare(
-          `SELECT content_text, ended_at, event_type, id, occurred_at, process_status,
+          `SELECT canonical_event_json, content_text, ended_at, event_type, id, occurred_at, process_status,
                 process_type, run_id, seq, tokens
          FROM session_event
          WHERE session_id = ? AND run_id = ?

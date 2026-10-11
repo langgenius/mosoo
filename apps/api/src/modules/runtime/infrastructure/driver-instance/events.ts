@@ -2,6 +2,7 @@ import { EventType, MOSOO_CUSTOM_EVENT, createServerCustomEvent } from "@mosoo/a
 import type { SessionUsageSummary } from "@mosoo/ag-ui-session";
 import type { DriverEventEnvelope } from "@mosoo/agent-driver/events";
 import { parseDriverNativeRuntimeRef, parseNativeCheckpoint } from "@mosoo/agent-driver/runtime";
+import { MAX_THOUGHT_CONTENT_BYTES } from "@mosoo/agent-driver/runtime-events";
 import { parsePlatformId } from "@mosoo/id";
 import type { DriverInstanceId, SessionRunId } from "@mosoo/id";
 import {
@@ -9,6 +10,7 @@ import {
   readRuntimeEventPayload,
   readRuntimeEventPermissionRequest,
   readRuntimeEventString,
+  readRuntimeEventThoughtUpdate,
   readRuntimeRunPayload,
 } from "@mosoo/runtime-events";
 import type { RuntimeEventEnvelope } from "@mosoo/runtime-events";
@@ -328,6 +330,19 @@ export async function projectRuntimeDriverEvents(
       nextLiveState = applyAgUiEventToSessionLiveState(nextLiveState, liveEvent);
       appendSessionDeliveryEvent(envelope, liveEvent);
       liveStateChanged = true;
+    }
+    if (event.kind === "thought.updated") {
+      const { thoughtId } = readRuntimeEventThoughtUpdate(event);
+      const reasoning = nextLiveState.messages
+        .find((message) => message.id === thoughtId)
+        ?.segments.find((segment) => segment.kind === "reasoning");
+      if (
+        reasoning !== undefined &&
+        new TextEncoder().encode(JSON.stringify(reasoning.text)).byteLength - 2 >
+          MAX_THOUGHT_CONTENT_BYTES
+      ) {
+        throw new Error("Reasoning snapshot exceeds the content byte limit.");
+      }
     }
   }
 

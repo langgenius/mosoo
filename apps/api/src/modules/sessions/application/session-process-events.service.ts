@@ -12,6 +12,7 @@ import { requireProjectSession } from "../domain/session-access.policy";
 import { foldStreamedSessionEventRows } from "../domain/session-event-stream-fold";
 
 export interface SessionEventProcessRow {
+  canonical_event_json: string | null;
   content_text: string;
   ended_at: number;
   event_type: string;
@@ -145,6 +146,7 @@ export async function getThreadSessionProcessEvents(
   });
   const rows = await getAppDatabase(database)
     .select({
+      canonical_event_json: sessionEventsTable.canonicalEventJson,
       content_text: sessionEventsTable.contentText,
       ended_at: sessionEventsTable.endedAt,
       event_type: sessionEventsTable.eventType,
@@ -176,16 +178,12 @@ export async function getThreadSessionProcessEvents(
     return processEvents;
   }
 
-  const firstEvent = processEvents[0] ?? null;
-
-  if (firstEvent === null) {
-    return processEvents;
-  }
+  const firstOccurredAt = processEvents[0]?.occurredAt ?? toIsoString(rows[limit - 1]!.occurred_at);
 
   return [
     createProcessEventsTruncatedEvent({
       limit,
-      occurredAt: firstEvent.occurredAt,
+      occurredAt: firstOccurredAt,
       sessionId: session.id,
     }),
     ...processEvents,

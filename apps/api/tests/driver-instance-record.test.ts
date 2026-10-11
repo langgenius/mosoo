@@ -124,7 +124,6 @@ async function readDriverRecord(database: D1Database): Promise<{
   bootTokenHex: string;
   connectionId: string | null;
   errorMessage: string | null;
-  generation: number;
   processId: string | null;
   status: string;
 }> {
@@ -135,7 +134,6 @@ async function readDriverRecord(database: D1Database): Promise<{
           hex(boot_token_hash) AS bootTokenHex,
           connection_id AS connectionId,
           error_message AS errorMessage,
-          generation,
           process_id AS processId,
           status
         FROM driver_instance
@@ -146,7 +144,6 @@ async function readDriverRecord(database: D1Database): Promise<{
       bootTokenHex: string;
       connectionId: string | null;
       errorMessage: string | null;
-      generation: number;
       processId: string | null;
       status: string;
     }>();
@@ -162,7 +159,6 @@ function insertDriverRecord(
   database: SqliteD1Database,
   input: {
     driverInstanceId?: DriverInstanceId;
-    generation?: number;
     status?: string;
     updatedAt?: number;
   },
@@ -185,7 +181,6 @@ function insertDriverRecord(
           driver_version,
           error_message,
           expires_at,
-          generation,
           heartbeat_count,
           id,
           last_heartbeat_at,
@@ -217,7 +212,6 @@ function insertDriverRecord(
           NULL,
           NULL,
           200,
-          ${input.generation ?? 0},
           0,
           '${driverInstanceId}',
           NULL,
@@ -318,7 +312,6 @@ describe("driver instance records", () => {
     const created = await createDriverInstanceRecord(createBindings(database), creation);
     expect(created).toMatchObject({
       status: "created",
-      generation: 0,
       bootTokenExpiresAt: expect.any(Number),
     });
     const before = (await database.prepare("SELECT * FROM driver_instance_mcp_grant").all())
@@ -340,7 +333,7 @@ describe("driver instance records", () => {
     expect(
       (await database.prepare("SELECT * FROM driver_instance_mcp_grant").all()).results,
     ).toEqual(before);
-    expect(await readDriverRecord(database)).toMatchObject({ bootTokenHex: "02", generation: 0 });
+    expect(await readDriverRecord(database)).toMatchObject({ bootTokenHex: "02" });
     const sameTokenRetry = await createDriverInstanceRecord(createBindings(database), {
       ...creation,
       mcpGrants: [{ ...grant, serverId: parsePlatformId("01J000000000000000000000Y7") }],
@@ -413,7 +406,6 @@ describe("driver instance records", () => {
         } else {
           expect(workspaceAccesses).toBeGreaterThan(0);
           expect(await readDriverRecord(database)).toMatchObject({
-            generation: 0,
             status: "failed",
           });
         }
@@ -531,12 +523,10 @@ describe("driver instance records", () => {
 
     await expect(readDriverRecord(database)).resolves.toMatchObject({
       bootTokenHex: "01",
-      generation: 0,
       status: "provisioning",
     });
     expect(result).toEqual({
       bootTokenExpiresAt: null,
-      generation: null,
       reason: "existing-driver",
       status: "skipped",
     });
@@ -594,13 +584,11 @@ describe("driver instance records", () => {
       driverInstanceRecordMatchesBootToken(database, {
         bootTokenHash: token(1),
         driverInstanceId: DRIVER_INSTANCE_ID,
-        generation: 0,
       }),
     ).resolves.toBe(true);
     await expect(
       recordRuntimeProcessStarted(bindings, DRIVER_INSTANCE_ID, "process-stale", {
         expectedBootTokenHash: token(9),
-        expectedGeneration: 0,
       }),
     ).resolves.toBe(false);
     await expect(readDriverRecord(database)).resolves.toMatchObject({
@@ -609,7 +597,6 @@ describe("driver instance records", () => {
     await expect(
       recordRuntimeProcessStarted(bindings, DRIVER_INSTANCE_ID, "process-current", {
         expectedBootTokenHash: token(1),
-        expectedGeneration: 0,
       }),
     ).resolves.toBe(true);
     await expect(
@@ -617,7 +604,6 @@ describe("driver instance records", () => {
         bootTokenHash: token(9),
         driverInstanceId: DRIVER_INSTANCE_ID,
         errorMessage: "stale",
-        generation: 0,
       }),
     ).resolves.toBe(false);
     await expect(readDriverRecord(database)).resolves.toMatchObject({
@@ -630,7 +616,6 @@ describe("driver instance records", () => {
         bootTokenHash: token(1),
         driverInstanceId: DRIVER_INSTANCE_ID,
         errorMessage: "failed",
-        generation: 0,
       }),
     ).resolves.toBe(true);
     await expect(readDriverRecord(database)).resolves.toMatchObject({
@@ -642,7 +627,6 @@ describe("driver instance records", () => {
         bootTokenHash: token(1),
         driverInstanceId: DRIVER_INSTANCE_ID,
         errorMessage: "late failure",
-        generation: 0,
       }),
     ).resolves.toBe(false);
     await expect(readDriverRecord(database)).resolves.toMatchObject({
@@ -664,13 +648,11 @@ describe("driver instance records", () => {
       driverInstanceRecordMatchesBootToken(database, {
         bootTokenHash: token(1),
         driverInstanceId: DRIVER_INSTANCE_ID,
-        generation: 0,
       }),
     ).resolves.toBe(true);
     await expect(
       recordRuntimeProcessStarted(bindings, DRIVER_INSTANCE_ID, "process-adopted", {
         expectedBootTokenHash: token(1),
-        expectedGeneration: 0,
       }),
     ).resolves.toBe(true);
     await expect(
@@ -678,7 +660,6 @@ describe("driver instance records", () => {
         bootTokenHash: token(1),
         driverInstanceId: DRIVER_INSTANCE_ID,
         errorMessage: "failed after adoption",
-        generation: 0,
       }),
     ).resolves.toBe(true);
     await expect(readDriverRecord(database)).resolves.toMatchObject({
@@ -693,22 +674,28 @@ describe("driver instance records", () => {
     insertDriverRecord(database, {});
     const bindings = createBindings(database);
 
+    await expect(claimDriverInstanceByBootTokenHash(bindings, token(9))).resolves.toBeNull();
     await expect(claimDriverInstanceByBootTokenHash(bindings, token(1))).resolves.toEqual({
       driverInstanceId: DRIVER_INSTANCE_ID,
-      generation: 0,
     });
+    await expect(claimDriverInstanceByBootTokenHash(bindings, token(1))).resolves.toBeNull();
+    await expect(
+      markDriverInstanceConnected(bindings, {
+        bootTokenHash: token(9),
+        connectionId: "connection-stale",
+        driverInstanceId: DRIVER_INSTANCE_ID,
+      }),
+    ).resolves.toBe(false);
     await expect(
       markDriverInstanceConnected(bindings, {
         bootTokenHash: token(1),
         connectionId: "connection-1",
         driverInstanceId: DRIVER_INSTANCE_ID,
-        generation: 0,
       }),
     ).resolves.toBe(true);
     await recordDriverInstanceHello(bindings, {
       connectionId: "connection-1",
       driverInstanceId: DRIVER_INSTANCE_ID,
-      generation: 0,
       hello: {
         capabilities: [],
         driverVersion: "driver-test",
@@ -718,18 +705,24 @@ describe("driver instance records", () => {
         startedAt: "2026-05-08T00:00:00.000Z",
       },
     });
+    await expect(
+      markDriverInstanceReady(bindings, {
+        at: "2026-05-08T00:00:01.000Z",
+        connectionId: "connection-stale",
+        driverInstanceId: DRIVER_INSTANCE_ID,
+        pid: 99,
+      }),
+    ).resolves.toBe(false);
     await markDriverInstanceReady(bindings, {
       at: "2026-05-08T00:00:01.000Z",
       connectionId: "connection-1",
       driverInstanceId: DRIVER_INSTANCE_ID,
-      generation: 0,
       pid: 22,
     });
     await expect(
       recordDriverInstanceHello(bindings, {
         connectionId: "connection-1",
         driverInstanceId: DRIVER_INSTANCE_ID,
-        generation: 0,
         hello: {
           capabilities: [],
           driverVersion: "late-driver-test",
@@ -772,14 +765,12 @@ describe("driver instance records", () => {
         bootTokenHash: token(1),
         driverInstanceId: DRIVER_INSTANCE_ID,
         errorMessage: "failed first",
-        generation: 0,
       }),
     ).resolves.toBe(true);
     await expect(
       finalizeDriverInstance(bindings, DRIVER_INSTANCE_ID, {
         connectionId: "connection-1",
         closeReason: "late close",
-        generation: 0,
         heartbeatCount: 3,
         status: "stopped",
       }),

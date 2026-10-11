@@ -9,7 +9,7 @@ import { getCredentialByIdOrNull } from "../../mcp/application/mcp-credential.re
 import { getCredentialStatus } from "../../mcp/application/mcp-mappers";
 import { getServerRowOrNull } from "../../mcp/application/mcp-server.repository";
 import { readSecret } from "../../vault/application/vault-secret-store";
-import { isDriverInstanceGenerationActive } from "../infrastructure/driver-instance/driver-instance-record.repository";
+import { isDriverInstanceActive } from "../infrastructure/driver-instance/driver-instance-record.repository";
 import { getDriverInstanceMcpProxyGrant } from "../infrastructure/driver-instance/mcp-grants.repository";
 import { getRuntimeSessionLink } from "../infrastructure/driver-instance/session-link.repository";
 import { createRuntimeMcpDelegationToken } from "./runtime-mcp-delegation";
@@ -63,16 +63,12 @@ async function createDelegationToken(
 export async function resolveRuntimeMcpProxyTarget(
   bindings: ApiBindings,
   input: {
-    driverGeneration: number;
     driverInstanceId: DriverInstanceId;
     serverId: McpServerId;
     toolCallId: string | null;
   },
 ): Promise<RuntimeMcpProxyTarget> {
-  const driverIsActive = await isDriverInstanceGenerationActive(bindings.DB, {
-    driverInstanceId: input.driverInstanceId,
-    generation: input.driverGeneration,
-  });
+  const driverIsActive = await isDriverInstanceActive(bindings.DB, input.driverInstanceId);
 
   if (!driverIsActive) {
     throw new RuntimeMcpProxyError(

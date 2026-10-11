@@ -36,7 +36,6 @@ export class DriverInstanceRpcHandshakeController {
     const recorded = await recordDriverInstanceHeartbeat(env, {
       connectionId: context.connectionId,
       driverInstanceId: state.requireDriverInstanceId(),
-      generation: state.requireDriverGeneration(),
       heartbeat: input,
       heartbeatCount: state.heartbeatCount,
     });
@@ -65,7 +64,6 @@ export class DriverInstanceRpcHandshakeController {
     const recorded = await recordDriverInstanceHello(env, {
       connectionId: context.connectionId,
       driverInstanceId: state.requireDriverInstanceId(),
-      generation: state.requireDriverGeneration(),
       hello: input,
     });
 
@@ -128,7 +126,6 @@ export class DriverInstanceRpcHandshakeController {
       ...input,
       connectionId: context.connectionId,
       driverInstanceId: state.requireDriverInstanceId(),
-      generation: state.requireDriverGeneration(),
     });
 
     if (!markedReady) {

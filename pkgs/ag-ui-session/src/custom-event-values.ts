@@ -89,6 +89,12 @@ export interface MosooSessionToolInputUpdatedValue {
   toolCallId: string;
 }
 
+export interface MosooSessionReasoningUpdatedValue {
+  content: string;
+  messageId: string;
+  offset: number;
+}
+
 export interface MosooSessionInfoUpdatedValue {
   title?: string | null;
   updatedAt?: string | null;

@@ -1,4 +1,8 @@
-import type { DriverRecoveryMessage, NativeCheckpoint } from "@mosoo/agent-driver/boot";
+import type {
+  DriverModelConnection,
+  DriverRecoveryMessage,
+  NativeCheckpoint,
+} from "@mosoo/agent-driver/boot";
 import type { DriverNativeRuntimeRef, DriverRuntime } from "@mosoo/agent-driver/runtime";
 import type { JsonObject } from "@mosoo/contracts";
 import type { AgentBuiltInToolConfig, AgentReadiness } from "@mosoo/contracts/agent";
@@ -221,6 +225,7 @@ export interface DriverExecutionSpec {
   readonly configRevision: DriverConfigRevision;
   readonly environment: DriverExecutionEnvironment;
   readonly model: string;
+  readonly modelConnection: DriverModelConnection;
   readonly permissionPolicy: DriverPermissionPolicy;
   readonly profilePrompt: string;
   readonly provider: string;

@@ -232,7 +232,6 @@ function rejectLlmProxyCapability(
   // arbitrary paths, models, headers, parse errors, or body content into logs.
   logWarn("runtime.llm_proxy.capability_rejected", {
     credentialId: grant.resourceId,
-    driverGeneration: grant.driverGeneration,
     driverInstanceId: grant.driverInstanceId,
     modelProtocol: grant.modelProtocol,
     projectId: grant.projectId,
@@ -526,7 +525,6 @@ export function registerDriverRoute(app: Hono<ApiGatewayEnvironment>) {
 
     try {
       await requireActiveRuntimeLlmProxyDriver(c.env, {
-        driverGeneration: grant.driverGeneration,
         driverInstanceId: grant.driverInstanceId,
       });
     } catch (error) {
@@ -637,7 +635,6 @@ export function registerDriverRoute(app: Hono<ApiGatewayEnvironment>) {
 
     try {
       target = await resolveRuntimeMcpProxyTarget(c.env, {
-        driverGeneration: grant.driverGeneration,
         driverInstanceId: grant.driverInstanceId,
         serverId: grant.resourceId,
         toolCallId,

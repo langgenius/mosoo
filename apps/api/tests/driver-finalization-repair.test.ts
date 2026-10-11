@@ -252,7 +252,6 @@ async function createSocketCloseFinalizationFixture() {
   await beforeRestart.setDriverInstanceId(driverInstanceId);
   await beforeRestart.recordAcceptedConnection({
     connectionId: "connection-finalized",
-    driverGeneration: 0,
     traceId: null,
   });
   await beforeRestart.persistClose({
@@ -470,38 +469,32 @@ describe("driver finalization repair", () => {
     ).toHaveLength(1);
   });
 
-  test.each([
-    { connectionId: "successor-connection", generation: 0 },
-    { connectionId: "connection-finalized", generation: 1 },
-  ])(
-    "never repairs a successor connection or generation: %j",
-    async ({ connectionId, generation }) => {
-      const fixture = await createSocketCloseFinalizationFixture();
-      const { database, driverInstanceId } = fixture;
+  test("never repairs a successor connection", async () => {
+    const fixture = await createSocketCloseFinalizationFixture();
+    const { database, driverInstanceId } = fixture;
+    await database
+      .prepare("UPDATE driver_instance SET connection_id = ? WHERE id = ?")
+      .bind("successor-connection", driverInstanceId)
+      .run();
+    const { coordinator } = await fixture.restore();
+    await Promise.all([coordinator.finalize(), coordinator.finalize()]);
+    expect(
       await database
-        .prepare("UPDATE driver_instance SET connection_id = ?, generation = ? WHERE id = ?")
-        .bind(connectionId, generation, driverInstanceId)
-        .run();
-      const { coordinator } = await fixture.restore();
-      await Promise.all([coordinator.finalize(), coordinator.finalize()]);
-      expect(
-        await database
-          .prepare("SELECT status, close_code FROM driver_instance WHERE id = ?")
-          .bind(driverInstanceId)
-          .first(),
-      ).toEqual({ status: "ready", close_code: null });
-      expect(
-        await database
-          .prepare("SELECT status FROM session_run WHERE id = ?")
-          .bind(FINALIZE_RUN_ID)
-          .first(),
-      ).toEqual({ status: "running" });
-      expect(
-        (await readTerminalEvents(database)).filter((event) => event.event_type === "run.failed"),
-      ).toHaveLength(0);
-      expect(fixture.readAlarm()).toBeNull();
-    },
-  );
+        .prepare("SELECT connection_id, status, close_code FROM driver_instance WHERE id = ?")
+        .bind(driverInstanceId)
+        .first(),
+    ).toEqual({ connection_id: "successor-connection", status: "ready", close_code: null });
+    expect(
+      await database
+        .prepare("SELECT status FROM session_run WHERE id = ?")
+        .bind(FINALIZE_RUN_ID)
+        .first(),
+    ).toEqual({ status: "running" });
+    expect(
+      (await readTerminalEvents(database)).filter((event) => event.event_type === "run.failed"),
+    ).toHaveLength(0);
+    expect(fixture.readAlarm()).toBeNull();
+  });
 
   test("fails the active run lease and publishes a replayable terminal event", async () => {
     const database = await createPublicHttpContractDatabase();

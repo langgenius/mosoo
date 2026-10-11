@@ -440,7 +440,6 @@ export async function prewarmDriverSession(
             const stillOwnsRecord = await driverInstanceRecordMatchesBootToken(bindings.DB, {
               bootTokenHash: provision.bootTokenHash,
               driverInstanceId: provision.driverInstanceId,
-              generation: provision.driverGeneration,
             });
 
             return stillOwnsRecord
@@ -458,7 +457,6 @@ export async function prewarmDriverSession(
               bootTokenHash: provision.bootTokenHash,
               driverInstanceId: provision.driverInstanceId,
               errorMessage: message,
-              generation: provision.driverGeneration,
             });
           },
           process: provision.process,
@@ -468,7 +466,6 @@ export async function prewarmDriverSession(
       const stillOwnsReadyRecord = await driverInstanceRecordMatchesBootToken(bindings.DB, {
         bootTokenHash: provision.bootTokenHash,
         driverInstanceId: provision.driverInstanceId,
-        generation: provision.driverGeneration,
       });
 
       if (!stillOwnsReadyRecord) {

@@ -11,6 +11,7 @@ export type SessionViewSegment =
     }
   | {
       kind: "reasoning";
+      status: "streaming" | "snapshot" | "completed";
       text: string;
     }
   | {

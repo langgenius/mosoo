@@ -1187,7 +1187,7 @@ describe("Public Thread API e2e", () => {
         expect(text).toContain("event: thread.event");
         expect(text).toContain("id: 01J00000000000000000000011");
         expect(text).not.toContain("id: 01J00000000000000000000012");
-        expect(text).not.toContain("id: 01J00000000000000000000013");
+        expect(text).toContain("id: 01J00000000000000000000013");
         expect(text).toContain("id: 01J00000000000000000000014");
         expect(text).not.toContain("id: 01J00000000000000000000015");
         expect(text).not.toContain("id: 01J00000000000000000000016");

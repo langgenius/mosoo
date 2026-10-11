@@ -60,6 +60,10 @@ export const MOSOO_CUSTOM_EVENT = {
     direction: "server",
     name: "mosoo.session.plan.updated",
   },
+  sessionReasoningUpdated: {
+    direction: "server",
+    name: "mosoo.session.reasoning.updated",
+  },
   sessionRunUpdated: {
     direction: "server",
     name: "mosoo.session.run.updated",

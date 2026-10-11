@@ -1,5 +1,6 @@
+import type { MosooSessionReasoningUpdatedValue } from "./custom-event-values";
 import type { SessionLiveState } from "./live-state";
-import { createLiveStateMessage } from "./live-state-message-core.reducer";
+import { createLiveStateMessage, upsertMessage } from "./live-state-message-core.reducer";
 import { touchSessionLiveState } from "./live-state.reducer-core";
 
 // Reasoning streams (REASONING_MESSAGE_*) get their own assistant message keyed
@@ -21,7 +22,7 @@ export function appendReasoningDelta(
         content: "",
         id: input.messageId,
         role: "assistant",
-        segments: [{ kind: "reasoning", text: input.delta }],
+        segments: [{ kind: "reasoning", status: "streaming", text: input.delta }],
       }),
     );
 
@@ -39,12 +40,14 @@ export function appendReasoningDelta(
   const lastSegment = segments.at(-1);
 
   if (lastSegment?.kind === "reasoning") {
+    if (lastSegment.status !== "streaming") return state;
     segments[segments.length - 1] = {
       kind: "reasoning",
+      status: "streaming",
       text: `${lastSegment.text}${input.delta}`,
     };
   } else {
-    segments.push({ kind: "reasoning", text: input.delta });
+    segments.push({ kind: "reasoning", status: "streaming", text: input.delta });
   }
 
   messages[index] = {
@@ -55,6 +58,48 @@ export function appendReasoningDelta(
   return touchSessionLiveState({
     ...state,
     messages,
+  });
+}
+
+export function updateReasoningSnapshot(
+  state: SessionLiveState,
+  input: MosooSessionReasoningUpdatedValue,
+): SessionLiveState {
+  const current = state.messages.find((message) => message.id === input.messageId);
+  const reasoning = current?.segments.find((segment) => segment.kind === "reasoning");
+  let text = input.content;
+
+  if (reasoning !== undefined && reasoning.status !== "streaming") {
+    if (
+      input.offset + input.content.length <= reasoning.text.length &&
+      reasoning.text.slice(input.offset, input.offset + input.content.length) === input.content
+    ) {
+      return state;
+    }
+    if (reasoning.status === "completed" || input.offset !== reasoning.text.length) {
+      throw new Error("Reasoning snapshot chunks must be contiguous and immutable.");
+    }
+    text = reasoning.text + input.content;
+  } else if (input.offset !== 0) {
+    throw new Error("Reasoning snapshot must start at offset zero.");
+  }
+
+  return upsertMessage(state, {
+    ...(current ?? createLiveStateMessage({ content: "", id: input.messageId, role: "assistant" })),
+    segments: [{ kind: "reasoning", status: "snapshot", text }],
+  });
+}
+
+export function completeReasoning(state: SessionLiveState, messageId: string): SessionLiveState {
+  const current = state.messages.find((message) => message.id === messageId);
+  const reasoning = current?.segments.find((segment) => segment.kind === "reasoning");
+  if (current === undefined || reasoning === undefined || reasoning.status === "completed") {
+    return state;
+  }
+
+  return upsertMessage(state, {
+    ...current,
+    segments: [{ ...reasoning, status: "completed" }],
   });
 }
 

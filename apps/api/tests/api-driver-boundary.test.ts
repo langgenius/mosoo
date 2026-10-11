@@ -66,7 +66,6 @@ describe("API to driver boundary", () => {
       };
       const execution = await buildExecutionSpec(bindings, {
         builtInTools: [],
-        driverGeneration: 0,
         driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
         nativeResumeRef: {
           kind: "openai_thread_id",
@@ -92,7 +91,6 @@ describe("API to driver boundary", () => {
         bootToken: "native-recovery-test",
         controlUrl: "https://api.example.com/api/driver/socket",
         driverControlPort: DRIVER_CONTROL_PORT_MIN,
-        driverGeneration: 0,
         driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
         execution,
         heartbeatIntervalMs: 1_000,
@@ -142,7 +140,6 @@ describe("API to driver boundary", () => {
         { enabled: true, name: "web_fetch" },
         { enabled: true, name: "web_search" },
       ],
-      driverGeneration: 7,
       driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
       nativeResumeRef: {
         kind: "openai_thread_id",
@@ -168,20 +165,19 @@ describe("API to driver boundary", () => {
     expect(execution.configRevision.runId).toBe(API_DRIVER_BOUNDARY_IDS.sessionRun);
     expect(execution.profilePrompt).toContain("You are a helpful runtime.");
     expect(execution.profilePrompt).toContain("`outputs/`");
-    const llmProxyGrant = execution.environment.variables["OPENAI_API_KEY"];
-    if (llmProxyGrant === undefined) {
-      throw new Error("Expected an LLM proxy grant env var.");
-    }
+    const llmProxyGrant = execution.modelConnection.proxyGrant;
 
     expect(execution.environment.variables).toEqual({
       EXISTING_ENV: "kept",
-      OPENAI_API_KEY: llmProxyGrant,
-      OPENAI_BASE_URL: `http://localhost:8787/api/driver/llm/proxy/${PLATFORM_ID_FIXTURES.vendorCredential}`,
+    });
+    expect(execution.modelConnection).toEqual({
+      protocol: "openai-responses",
+      proxyGrant: llmProxyGrant,
+      proxyUrl: `http://localhost:8787/api/driver/llm/proxy/${PLATFORM_ID_FIXTURES.vendorCredential}`,
     });
     await expect(verifyRuntimeActionToken(bindings, llmProxyGrant)).resolves.toMatchObject({
       action: "llm_proxy",
       projectId: API_DRIVER_BOUNDARY_IDS.project,
-      driverGeneration: 7,
       driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
       modelId: "gpt-5.5",
       modelProtocol: "openai-responses",
@@ -201,7 +197,6 @@ describe("API to driver boundary", () => {
       verifyRuntimeActionToken(bindings, activeMcpServer.proxyGrantId),
     ).resolves.toMatchObject({
       action: "mcp_proxy",
-      driverGeneration: 7,
       driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
       resourceId: API_DRIVER_BOUNDARY_IDS.mcpServerLinear,
     });
@@ -231,7 +226,6 @@ describe("API to driver boundary", () => {
   test("emits a boot payload that the driver protocol parser accepts", async () => {
     const execution = await buildExecutionSpec(bindings, {
       builtInTools: createDefaultAgentBuiltInTools(),
-      driverGeneration: 0,
       driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
       profile: createDriverProfile(),
       requestUrl: "https://api.example.com/api/driver/connect",
@@ -244,7 +238,6 @@ describe("API to driver boundary", () => {
       bootToken: "boot-token-1",
       controlUrl: "https://api.example.com/api/driver/socket",
       driverControlPort: DRIVER_CONTROL_PORT_MIN,
-      driverGeneration: 0,
       driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
       execution,
       heartbeatIntervalMs: 1_000,
@@ -264,7 +257,6 @@ describe("API to driver boundary", () => {
     });
     expect(parsed).toMatchObject({
       driverControlPort: DRIVER_CONTROL_PORT_MIN,
-      driverGeneration: 0,
       driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
       heartbeatIntervalMs: 1_000,
       protocolVersion: DRIVER_PROTOCOL_VERSION,

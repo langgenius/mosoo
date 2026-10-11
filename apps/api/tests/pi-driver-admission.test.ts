@@ -11,7 +11,7 @@ import { readNativeResumeRef } from "../src/modules/runtime/infrastructure/drive
 import { upsertNativeResumeRef } from "../src/modules/runtime/infrastructure/native-resume-ref.repository";
 import { verifyRuntimeActionToken } from "../src/modules/runtime/infrastructure/runtime-boot-token";
 import { buildExecutionSpec } from "../src/modules/runtime/infrastructure/runtime-sandbox-provisioning/runtime-driver-execution-spec.builder";
-import { buildVendorProxyEnvVars } from "../src/modules/runtime/infrastructure/runtime-sandbox-provisioning/runtime-vendor-proxy-env.builder";
+import { buildModelConnection } from "../src/modules/runtime/infrastructure/runtime-sandbox-provisioning/runtime-model-connection.builder";
 import { sandboxBindingForRuntime } from "../src/platform/cloudflare/sandbox-binding";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
@@ -39,9 +39,8 @@ test("Given Pi v1, When selecting the public runtime, Then admit its Cloudflare 
 
 test("Given a Pi credential, When provisioning, Then bind a Chat Completions grant without a raw key", async () => {
   const bindings = { RUNTIME_ACTION_TOKEN_SECRET: "pi-product-test" };
-  const variables = await buildVendorProxyEnvVars({
+  const connection = await buildModelConnection({
     bindings,
-    driverGeneration: 3,
     driverInstanceId: ids.driverInstance,
     requestUrl: "https://api.example.com/",
     profile: {
@@ -56,16 +55,13 @@ test("Given a Pi credential, When provisioning, Then bind a Chat Completions gra
       },
     },
   });
-  expect(JSON.parse(variables.MOSOO_PI_CONFIG_CONTENT ?? "{}")).toEqual({
-    baseUrl: `https://api.example.com/api/driver/llm/proxy/${ids.vendorCredential}`,
-    modelProtocol: "openai-chat-completions",
+  expect(connection).toMatchObject({
+    proxyUrl: `https://api.example.com/api/driver/llm/proxy/${ids.vendorCredential}`,
+    protocol: "openai-chat-completions",
   });
-  expect(
-    await verifyRuntimeActionToken(bindings, variables.MOSOO_PI_PROXY_GRANT ?? ""),
-  ).toMatchObject({
+  expect(await verifyRuntimeActionToken(bindings, connection.proxyGrant)).toMatchObject({
     modelId: "custom-model",
     modelProtocol: "openai-chat-completions",
-    driverGeneration: 3,
   });
 });
 
@@ -73,7 +69,6 @@ function piInput() {
   const profile = createDriverProfile();
   return {
     builtInTools: [],
-    driverGeneration: 3,
     driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
     requestUrl: "https://api.example.com/",
     resolvedMcpServers: [],
@@ -123,7 +118,6 @@ test("Given Pi MCP bindings, When building execution, Then issue the usual scope
   if (active?.authorizationState !== "active") throw new Error("Missing active MCP binding.");
   expect(await verifyRuntimeActionToken(bindings, active.proxyGrantId)).toMatchObject({
     action: "mcp_proxy",
-    driverGeneration: 3,
     driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
     resourceId: API_DRIVER_BOUNDARY_IDS.mcpServerLinear,
   });

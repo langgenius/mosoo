@@ -163,6 +163,7 @@ export const driverInstancesTable = sqliteTable(
     errorMessage: text("error_message"),
     expiresAt: integer("expires_at").notNull(),
     heartbeatCount: integer("heartbeat_count").notNull(),
+    // Preserve historical generation and restart_count columns without altering deployed databases.
     generation: integer("generation").notNull().default(0),
     id: platformIdColumn<DriverInstanceId>("id").primaryKey(),
     lastHeartbeatAt: integer("last_heartbeat_at"),

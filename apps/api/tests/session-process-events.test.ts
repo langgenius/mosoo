@@ -7,6 +7,7 @@ import type {
   SessionRuntimeEventVisibility,
 } from "@mosoo/contracts/session";
 import { parsePlatformId } from "@mosoo/id";
+import { createRuntimeEvent } from "@mosoo/runtime-events";
 
 import type { AuthenticatedViewer } from "../src/modules/auth/application/viewer-auth.service";
 import { getThreadSessionProcessEvents } from "../src/modules/sessions/application/session-process-events.service";
@@ -189,6 +190,7 @@ function createProcessEventQueryDatabase(): SqliteD1Database {
 async function insertSessionProcessEvent(
   database: SqliteD1Database,
   input: {
+    canonicalEventJson?: string;
     content?: string;
     endedAt?: number;
     eventType?: string;
@@ -210,6 +212,7 @@ async function insertSessionProcessEvent(
     .prepare(
       `
         INSERT INTO session_event (
+          canonical_event_json,
           id,
           content_text,
           ended_at,
@@ -222,10 +225,11 @@ async function insertSessionProcessEvent(
           session_id,
           tokens,
           visibility
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
     )
     .bind(
+      input.canonicalEventJson ?? null,
       input.id,
       input.content ?? `run-${input.seq}`,
       input.endedAt ?? occurredAt,
@@ -243,6 +247,36 @@ async function insertSessionProcessEvent(
 }
 
 describe("session process event projection", () => {
+  test("reads canonical thought chunks and marks a window missing the first chunk as truncated", async () => {
+    const database = createProcessEventQueryDatabase();
+    for (const [index, content] of ["Saved", " thought"].entries()) {
+      await insertSessionProcessEvent(database, {
+        canonicalEventJson: JSON.stringify(
+          createRuntimeEvent({
+            id: parsePlatformId("01J00000000000000000000010"),
+            kind: "thought.updated",
+            occurredAt: new Date((index + 1) * 1000).toISOString(),
+            payload: { content, offset: index === 0 ? 0 : 5, thoughtId: "thought" },
+            sessionId: parsePlatformId(SESSION_ID),
+          }),
+        ),
+        content,
+        eventType: "thought.updated",
+        id: `thought-${index}`,
+        processType: "agent.thinking.delta",
+        seq: index + 1,
+      });
+    }
+
+    const session = { projectId: PROJECT_ID, sessionId: SESSION_ID };
+    expect(await getThreadSessionProcessEvents(database, VIEWER, session)).toMatchObject([
+      { content: "Saved thought", type: "agent.thinking.delta" },
+    ]);
+    expect(
+      await getThreadSessionProcessEvents(database, VIEWER, session, { limit: 1 }),
+    ).toMatchObject([{ status: "unsupported", type: "session.status" }]);
+  });
+
   test("rejects invalid process event limits", async () => {
     await expect(
       getThreadSessionProcessEvents(

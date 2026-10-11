@@ -19,8 +19,10 @@ import type { SQL } from "drizzle-orm";
 
 import { createErrorLogContext, logWarn } from "../../platform/cloudflare/logger";
 import { getAppDatabase } from "../../platform/db/drizzle";
+import { toIsoString } from "../../time";
 import { createSessionProcessEventsFromSessionEventRows } from "../sessions/application/session-process-events.service";
 import type { SessionEventProcessRow } from "../sessions/application/session-process-events.service";
+import { readStoredThoughtEvent } from "../sessions/domain/session-event-stream-fold";
 import { connectSessionPublicEventWebSocket } from "../sessions/infrastructure/session/client";
 import { publicInternalError, toPublicApiError } from "./public-api-errors";
 import { sanitizePublicOutput } from "./public-output-sanitization";
@@ -61,6 +63,10 @@ interface LiveMessageState {
 class PublicLiveEventRowProjector {
   readonly #messages = new Map<string, LiveMessageState>();
   readonly #messageKeysByRun = new Map<string, Set<string>>();
+  readonly #thoughts = new Map<
+    string,
+    { filter: OpenAiPrivateCitationStreamFilter; nextOffset: number; runId: SessionRunId | null }
+  >();
 
   #getMessageRunKey(row: PublicThreadEventProcessRow): string {
     return row.run_id ?? "";
@@ -96,6 +102,9 @@ class PublicLiveEventRowProjector {
   }
 
   #deleteRunMessages(runId: SessionRunId | null): void {
+    for (const [key, thought] of this.#thoughts) {
+      if (thought.runId === runId) this.#thoughts.delete(key);
+    }
     const runKey = runId ?? "";
     const messageKeys = this.#messageKeysByRun.get(runKey);
 
@@ -114,6 +123,41 @@ class PublicLiveEventRowProjector {
     const output: PublicThreadEventProcessRow[] = [];
 
     for (const row of rows) {
+      if (row.event_type.startsWith("thought.")) {
+        if (
+          row.event_type === "thought.started" ||
+          row.event_type === "thought.delta" ||
+          row.canonical_event_json === null
+        ) {
+          continue;
+        }
+        const storedThought = readStoredThoughtEvent(row);
+        if (storedThought === null) continue;
+        const thoughtKey = JSON.stringify([row.run_id, storedThought.thoughtId]);
+        if (storedThought.offset !== null) {
+          let thought = this.#thoughts.get(thoughtKey);
+          if (thought === undefined) {
+            if (storedThought.offset !== 0) continue;
+            thought = {
+              filter: new OpenAiPrivateCitationStreamFilter(),
+              nextOffset: 0,
+              runId: row.run_id,
+            };
+            this.#thoughts.set(thoughtKey, thought);
+          }
+          if (storedThought.offset !== thought.nextOffset) {
+            throw new Error("Persisted thought content chunks are not contiguous.");
+          }
+          thought.nextOffset += storedThought.content.length;
+          output.push({ ...row, content_text: thought.filter.push(storedThought.content).text });
+        } else {
+          const contentText = this.#thoughts.get(thoughtKey)?.filter.finish().text ?? "";
+          this.#thoughts.delete(thoughtKey);
+          if (contentText.length > 0) output.push({ ...row, content_text: contentText });
+        }
+        continue;
+      }
+
       const key = this.#getMessageKey(row);
 
       if (row.event_type === "message.started") {
@@ -176,14 +220,6 @@ class PublicLiveEventRowProjector {
           }
           continue;
         }
-      }
-
-      if (
-        row.event_type === "thought.started" ||
-        row.event_type === "thought.completed" ||
-        row.event_type === "thought.cancelled"
-      ) {
-        continue;
       }
 
       if (
@@ -362,6 +398,26 @@ function toPublicThreadEventLogEntries(
   });
 }
 
+function toPublicThreadStreamEventLogEntries(
+  rows: PublicThreadEventProcessRow[],
+): PublicThreadEventLogEntry[] {
+  return rows.flatMap((row) => {
+    const event = toPublicThreadEventLogEntry({
+      event: {
+        content: row.content_text,
+        durationMs: Math.max(0, row.ended_at - row.occurred_at),
+        id: row.id,
+        occurredAt: toIsoString(row.occurred_at),
+        status: row.process_status,
+        tokens: row.tokens,
+        type: row.process_type,
+      },
+      row,
+    });
+    return event === null ? [] : [event];
+  });
+}
+
 function selectPublicThreadEventRows(input: {
   database: D1Database;
   filters: SQL[];
@@ -370,6 +426,7 @@ function selectPublicThreadEventRows(input: {
 }) {
   return getAppDatabase(input.database)
     .select({
+      canonical_event_json: sessionEventsTable.canonicalEventJson,
       content_text: sessionEventsTable.contentText,
       ended_at: sessionEventsTable.endedAt,
       event_type: sessionEventsTable.eventType,
@@ -538,22 +595,12 @@ function enqueueSseText(controller: ReadableStreamDefaultController<Uint8Array>,
 
 function enqueueThreadEvents(input: {
   controller: ReadableStreamDefaultController<Uint8Array>;
-  emittedEventIds: Set<RuntimeEventId>;
   events: PublicThreadEventLogEntry[];
 }): boolean {
-  let enqueued = false;
-
   for (const event of input.events) {
-    if (input.emittedEventIds.has(event.id)) {
-      continue;
-    }
-
-    input.emittedEventIds.add(event.id);
     enqueueSseText(input.controller, encodeSseThreadEvent(event));
-    enqueued = true;
   }
-
-  return enqueued;
+  return input.events.length > 0;
 }
 
 function isStreamStopped(input: {
@@ -592,13 +639,12 @@ export async function createPublicThreadEventStream(
     wakeup.close();
     throw error;
   }
-  const emittedEventIds = new Set<RuntimeEventId>();
   const state = {
     cancelled: false,
   };
   let lastSeenSeq = initialWindow.latestSeq ?? 0;
   const liveProjector = new PublicLiveEventRowProjector();
-  const initialEvents = toPublicThreadEventLogEntries(
+  const initialEvents = toPublicThreadStreamEventLogEntries(
     liveProjector.project(initialWindow.rows),
   ).slice(-limit);
 
@@ -610,7 +656,6 @@ export async function createPublicThreadEventStream(
         enqueueSseText(controller, encodeSseComment("connected"));
         enqueueThreadEvents({
           controller,
-          emittedEventIds,
           events: initialEvents,
         });
 
@@ -638,8 +683,7 @@ export async function createPublicThreadEventStream(
             enqueuedEvents =
               enqueueThreadEvents({
                 controller,
-                emittedEventIds,
-                events: toPublicThreadEventLogEntries(liveProjector.project(rows)),
+                events: toPublicThreadStreamEventLogEntries(liveProjector.project(rows)),
               }) || enqueuedEvents;
 
             if (rows.length < THREAD_EVENT_ROW_PAGE_SIZE) {

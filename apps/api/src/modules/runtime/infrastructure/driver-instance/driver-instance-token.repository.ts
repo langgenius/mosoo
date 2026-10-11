@@ -10,7 +10,7 @@ import { toDriverInstanceStatusLifecycleEventName } from "../../domain/driver-in
 export async function claimDriverInstanceByBootTokenHash(
   bindings: ApiBindings,
   bootTokenHash: Uint8Array,
-): Promise<{ driverInstanceId: DriverInstanceId; generation: number } | null> {
+): Promise<{ driverInstanceId: DriverInstanceId } | null> {
   const now = currentTimestampMs();
 
   return (
@@ -35,7 +35,6 @@ export async function claimDriverInstanceByBootTokenHash(
       )
       .returning({
         driverInstanceId: driverInstancesTable.id,
-        generation: driverInstancesTable.generation,
       })
       .get()) ?? null
   );

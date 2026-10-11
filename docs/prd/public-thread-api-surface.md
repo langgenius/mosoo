@@ -12,7 +12,14 @@ The HTTP contract an application backend uses to run work on mosoo: start a Thre
 - A Thread keeps the configuration it was created with. Later preset edits and publishes affect only new Threads.
 - **Identity.** The backend may label a Thread with an opaque `userId` (required on v1, optional on v2, stored as `null` when omitted). It is fixed at creation, need not be unique per Thread, and reaches MCP servers as the delegated end user ([MCP connections](./mcp-interaction.md)). mosoo does not authenticate end users; the backend owns their login and authorization.
 - **Keys.** Project API keys are backend secrets created in Project settings, each valid for exactly one Project ([SPEC](../SPEC.md) section 2). Rotating keys does not change Thread ownership: any key of the same Project continues the Thread.
-- **Events.** Events are persisted before delivery, and the list endpoint and SSE read the same history. SSE first sends the latest persisted events, then each new one once it is persisted. Events report sanitized progress, not raw runtime data. Correlate the start, confirmation and result of one tool call by `toolCallId`, not by event `id`.
+- **Events.** Events are persisted before delivery, and the list endpoint and SSE read the same history.
+  SSE first sends the latest persisted events, then each new one once it is persisted.
+  Reconnecting sends the latest window again; callers use the stable event IDs to skip entries they already received.
+  History replaces thinking previews with the final recorded text and combines its chunks.
+  SSE delivers each recorded chunk once with its persisted event ID, flushing any text held by output sanitization when the thought ends.
+  Live thinking previews are omitted from SSE because their final text may replace them.
+  Events report sanitized progress, not raw runtime data.
+  Correlate the start, confirmation and result of one tool call by `toolCallId`, not by event `id`.
 - **Files.** A Thread's files are its attachments plus the artifacts the Agent records, not the runtime workspace ([Thread files](./session-files.md)).
 - **Usage.** `GET /api/v2/threads/{threadId}/usage` lists one record per model call. It reads the Session's own call records, which the usage rollup behind [Project usage](./cost-dashboard.md) never removes. Missing values stay `null`; the only cost it returns is a USD amount the runtime itself reported, which is not an invoice.
 - **Retries.** Creation and follow-up accept an optional `Idempotency-Key`, scoped to the Project for Project keys and kept for 24 hours. The same key and body return the original result; a changed body conflicts; a repeat while the original is still processing returns `409`. Once a creation has stalled, a repeat reconciles it against what was committed; a stalled follow-up keeps returning `409` for the rest of the window rather than risk running twice. Save the returned Thread ID: after 24 hours the same key can create new work. Idempotency never makes external tool effects exactly-once.

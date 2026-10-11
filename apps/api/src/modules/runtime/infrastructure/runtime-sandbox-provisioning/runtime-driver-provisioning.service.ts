@@ -167,7 +167,7 @@ export async function provisionDriver(
   });
   const explicitControlOrigin = env.MOSOO_RUNTIME_CONTROL_ORIGIN?.trim() || undefined;
   const containerRequestUrl = toContainerReachableOrigin(input.requestUrl, explicitControlOrigin);
-  let driverGeneration: number | null = null;
+  let driverRecordCreated = false;
   let process: RuntimeProcessHandle | null = null;
 
   try {
@@ -187,8 +187,7 @@ export async function provisionDriver(
     if (driverRecord.status === "skipped") {
       throw new DriverPrewarmProvisionSkippedError(driverInstanceId);
     }
-    const activeDriverGeneration = driverRecord.generation;
-    driverGeneration = activeDriverGeneration;
+    driverRecordCreated = true;
 
     await installRuntimeEnvironment(env, {
       cloudflareSession: input.cloudflareSession,
@@ -223,7 +222,6 @@ export async function provisionDriver(
     const lostPrewarmOwnershipError = await getLostPrewarmOwnershipError(env, {
       bootTokenHash: bootToken.hash,
       driverInstanceId,
-      generation: activeDriverGeneration,
     });
 
     if (lostPrewarmOwnershipError !== null) {
@@ -233,7 +231,6 @@ export async function provisionDriver(
     const execution = await timing.measure("buildExecutionSpec", () =>
       buildExecutionSpec(env, {
         builtInTools: input.builtInTools,
-        driverGeneration: activeDriverGeneration,
         driverInstanceId,
         nativeCheckpoint,
         nativeResumeRef,
@@ -250,7 +247,6 @@ export async function provisionDriver(
       bootToken: bootToken.encoded,
       controlUrl: new URL(getRuntimeDriverSocketPath(), containerRequestUrl).toString(),
       driverControlPort,
-      driverGeneration: activeDriverGeneration,
       driverInstanceId,
       execution,
       heartbeatIntervalMs: DRIVER_HEARTBEAT_INTERVAL_MS,
@@ -280,14 +276,12 @@ export async function provisionDriver(
     await timing.measure("recordRuntimeProcessStarted", async () => {
       const recorded = await recordRuntimeProcessStarted(env, driverInstanceId, startedProcess.id, {
         expectedBootTokenHash: bootToken.hash,
-        expectedGeneration: activeDriverGeneration,
       });
 
       if (!recorded) {
         const staleError = await getLostPrewarmOwnershipError(env, {
           bootTokenHash: bootToken.hash,
           driverInstanceId,
-          generation: activeDriverGeneration,
         });
 
         if (staleError !== null) {
@@ -317,7 +311,6 @@ export async function provisionDriver(
 
     return {
       bootTokenHash: bootToken.hash,
-      driverGeneration: activeDriverGeneration,
       driverInstanceId,
       process: startedProcess,
       sandboxId,
@@ -327,12 +320,11 @@ export async function provisionDriver(
     const stalePrewarmError =
       error instanceof DriverPrewarmProvisionSkippedError
         ? error
-        : driverGeneration === null
+        : !driverRecordCreated
           ? null
           : await getLostPrewarmOwnershipError(env, {
               bootTokenHash: bootToken.hash,
               driverInstanceId,
-              generation: driverGeneration,
             });
 
     if (stalePrewarmError !== null) {
@@ -382,7 +374,6 @@ export async function provisionDriver(
           bootTokenHash: bootToken.hash,
           driverInstanceId,
           errorMessage: message,
-          ...(driverGeneration === null ? {} : { generation: driverGeneration }),
         });
       },
     });

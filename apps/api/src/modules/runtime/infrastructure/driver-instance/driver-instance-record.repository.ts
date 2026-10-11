@@ -29,12 +29,10 @@ import type { DriverInstanceStatus } from "./status";
 export type CreateDriverInstanceRecordResult =
   | {
       bootTokenExpiresAt: number;
-      generation: number;
       status: "created";
     }
   | {
       bootTokenExpiresAt: null;
-      generation: null;
       reason: "existing-driver";
       status: "skipped";
     };
@@ -78,14 +76,12 @@ export async function createDriverInstanceRecord(
     driverVersion: null,
     errorMessage: null,
     expiresAt: driverInstanceExpiresAt(now),
-    generation: 0,
     heartbeatCount: 0,
     id: input.driverInstanceId,
     lastHeartbeatAt: null,
     processId: null,
     protocol: "orpc-ws",
     protocolVersion: DRIVER_PROTOCOL_VERSION,
-    restartCount: 0,
     runtime: input.runtime,
     sandboxId: input.sandboxId,
     sandboxSessionId: input.sandboxSessionId,
@@ -148,7 +144,7 @@ export async function createDriverInstanceRecord(
   // Use the atomic D1 batch directly: the general compatibility adapter only
   // accepts writes without returned rows. Compile through the canonical tables.
   const executeClaim = (queries: { toSQL(): { sql: string; params: unknown[] } }[]) =>
-    bindings.DB.batch<{ boot_token_expires_at: number; generation: number }>(
+    bindings.DB.batch<{ boot_token_expires_at: number }>(
       queries.map((query) => {
         const statement = query.toSQL();
         return bindings.DB.prepare(statement.sql).bind(...statement.params);
@@ -159,7 +155,6 @@ export async function createDriverInstanceRecord(
     bindingGuard,
     database.insert(driverInstancesTable).values(driverRecord).onConflictDoNothing().returning({
       bootTokenExpiresAt: driverInstancesTable.bootTokenExpiresAt,
-      generation: driverInstancesTable.generation,
     }),
     ...ownedGrantInserts,
   ]);
@@ -168,7 +163,6 @@ export async function createDriverInstanceRecord(
   if (inserted === null) {
     return {
       bootTokenExpiresAt: null,
-      generation: null,
       reason: "existing-driver",
       status: "skipped",
     };
@@ -176,7 +170,6 @@ export async function createDriverInstanceRecord(
 
   return {
     bootTokenExpiresAt: inserted.boot_token_expires_at,
-    generation: inserted.generation,
     status: "created",
   };
 }
@@ -186,23 +179,18 @@ export async function driverInstanceRecordMatchesBootToken(
   input: {
     bootTokenHash: Uint8Array;
     driverInstanceId: DriverInstanceId;
-    generation?: number;
   },
 ): Promise<boolean> {
-  const conditions: SQL[] = [
-    eq(driverInstancesTable.id, input.driverInstanceId),
-    eq(driverInstancesTable.bootTokenHash, input.bootTokenHash),
-  ];
-
-  if (input.generation !== undefined) {
-    conditions.push(eq(driverInstancesTable.generation, input.generation));
-  }
-
   const row =
     (await getAppDatabase(database)
       .select({ id: driverInstancesTable.id })
       .from(driverInstancesTable)
-      .where(and(...conditions))
+      .where(
+        and(
+          eq(driverInstancesTable.id, input.driverInstanceId),
+          eq(driverInstancesTable.bootTokenHash, input.bootTokenHash),
+        ),
+      )
       .limit(1)
       .get()) ?? null;
 
@@ -213,7 +201,6 @@ export async function getDriverInstanceRecord(
   database: D1Database,
   driverInstanceId: DriverInstanceId,
 ): Promise<{
-  generation: number;
   sandboxId: SandboxId;
   sandboxSessionId: SessionId;
   status: DriverInstanceStatus;
@@ -221,7 +208,6 @@ export async function getDriverInstanceRecord(
   const row =
     (await getAppDatabase(database)
       .select({
-        generation: driverInstancesTable.generation,
         sandboxId: driverInstancesTable.sandboxId,
         sandboxSessionId: driverInstancesTable.sandboxSessionId,
         status: driverInstancesTable.status,
@@ -238,12 +224,9 @@ export async function getDriverInstanceRecord(
   return row;
 }
 
-export async function isDriverInstanceGenerationActive(
+export async function isDriverInstanceActive(
   database: D1Database,
-  input: {
-    driverInstanceId: DriverInstanceId;
-    generation: number;
-  },
+  driverInstanceId: DriverInstanceId,
 ): Promise<boolean> {
   const now = currentTimestampMs();
   const row =
@@ -252,8 +235,7 @@ export async function isDriverInstanceGenerationActive(
       .from(driverInstancesTable)
       .where(
         and(
-          eq(driverInstancesTable.id, input.driverInstanceId),
-          eq(driverInstancesTable.generation, input.generation),
+          eq(driverInstancesTable.id, driverInstanceId),
           or(
             and(
               eq(driverInstancesTable.status, "provisioning"),
@@ -292,14 +274,12 @@ export async function getReusableDriverInstanceRecord(
     sandboxSessionId: SessionId;
   },
 ): Promise<{
-  generation: number;
   id: DriverInstanceId;
   status: DriverInstanceStatus;
 } | null> {
   return (
     (await getAppDatabase(database)
       .select({
-        generation: driverInstancesTable.generation,
         id: driverInstancesTable.id,
         status: driverInstancesTable.status,
       })
@@ -323,7 +303,6 @@ export async function recordRuntimeProcessStarted(
   processId: string,
   options: {
     expectedBootTokenHash?: Uint8Array;
-    expectedGeneration?: number;
   } = {},
 ): Promise<boolean> {
   const now = currentTimestampMs();
@@ -334,10 +313,6 @@ export async function recordRuntimeProcessStarted(
 
   if (options.expectedBootTokenHash !== undefined) {
     conditions.push(eq(driverInstancesTable.bootTokenHash, options.expectedBootTokenHash));
-  }
-
-  if (options.expectedGeneration !== undefined) {
-    conditions.push(eq(driverInstancesTable.generation, options.expectedGeneration));
   }
 
   const row =
@@ -360,20 +335,9 @@ export async function markDriverInstanceFailedIfBootTokenMatches(
     bootTokenHash: Uint8Array;
     driverInstanceId: DriverInstanceId;
     errorMessage: string;
-    generation?: number;
   },
 ): Promise<boolean> {
   const now = currentTimestampMs();
-  const conditions: SQL[] = [
-    eq(driverInstancesTable.id, input.driverInstanceId),
-    eq(driverInstancesTable.bootTokenHash, input.bootTokenHash),
-    inArray(driverInstancesTable.status, LIVE_DRIVER_INSTANCE_STATUSES),
-  ];
-
-  if (input.generation !== undefined) {
-    conditions.push(eq(driverInstancesTable.generation, input.generation));
-  }
-
   const row =
     (await getAppDatabase(bindings.DB)
       .update(driverInstancesTable)
@@ -388,7 +352,13 @@ export async function markDriverInstanceFailedIfBootTokenMatches(
         statusSource: "api",
         updatedAt: now,
       })
-      .where(and(...conditions))
+      .where(
+        and(
+          eq(driverInstancesTable.id, input.driverInstanceId),
+          eq(driverInstancesTable.bootTokenHash, input.bootTokenHash),
+          inArray(driverInstancesTable.status, LIVE_DRIVER_INSTANCE_STATUSES),
+        ),
+      )
       .returning({ id: driverInstancesTable.id })
       .get()) ?? null;
 

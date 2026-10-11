@@ -26,7 +26,6 @@ import { RUNTIME_SOCKET_TIMEOUT_MS } from "../src/modules/runtime/domain/runtime
 import { getRuntimeDriverMcpProxyPath } from "../src/modules/runtime/domain/runtime-driver-routes";
 import { finalizeDriverInstance } from "../src/modules/runtime/infrastructure/driver-instance/lifecycle";
 import { createRuntimeActionToken } from "../src/modules/runtime/infrastructure/runtime-boot-token";
-import type { RuntimeActionTokenPayload } from "../src/modules/runtime/infrastructure/runtime-boot-token";
 import { storeSecret } from "../src/modules/vault/application/vault-secret-store";
 import type { ApiBindings, ApiGatewayEnvironment } from "../src/platform/cloudflare/worker-types";
 import { fromBase64Url } from "../src/shared/bytes";
@@ -47,7 +46,6 @@ const CREDENTIAL_ID = parsePlatformId<CredentialId>(
 const DRIVER_INSTANCE_ID = PUBLIC_API_TEST_IDS.driverOwner as DriverInstanceId;
 const PROJECT_ID = PUBLIC_API_TEST_IDS.project as ProjectId;
 const SESSION_ID = PUBLIC_API_TEST_IDS.ownerSession as SessionId;
-const GENERATION = 1;
 const CONNECTION_ID = "mcp-proxy-test-connection";
 const UPSTREAM_ACCESS_TOKEN = "mcp-upstream-secret";
 const UPSTREAM_URL = "https://mcp.example.test/rpc";
@@ -83,7 +81,6 @@ async function setupFixture(endUserId: string | null = null) {
       connectionId: CONNECTION_ID,
       createdAt: now,
       expiresAt: now + 60_000,
-      generation: GENERATION,
       heartbeatCount: 0,
       id: DRIVER_INSTANCE_ID,
       lastHeartbeatAt: now,
@@ -149,7 +146,6 @@ async function setupFixture(endUserId: string | null = null) {
 
   const grant = await createRuntimeActionToken(bindings, {
     action: "mcp_proxy",
-    driverGeneration: GENERATION,
     driverInstanceId: DRIVER_INSTANCE_ID,
     expiresAt: now + 60_000,
     resourceId: SERVER_ID,
@@ -229,7 +225,7 @@ describe("driver MCP proxy route", () => {
     },
   );
 
-  test.each(["stopped", "failed", "deleted", "stale heartbeat", "replaced generation"] as const)(
+  test.each(["stopped", "failed", "deleted", "stale heartbeat"] as const)(
     "rejects a %s driver before reading grants, credentials or secrets",
     async (state) => {
       const { bindings, database, grant } = await setupFixture();
@@ -238,7 +234,6 @@ describe("driver MCP proxy route", () => {
         expect(
           await finalizeDriverInstance(bindings, DRIVER_INSTANCE_ID, {
             connectionId: CONNECTION_ID,
-            generation: GENERATION,
             heartbeatCount: 0,
             status: state,
           }),
@@ -251,11 +246,7 @@ describe("driver MCP proxy route", () => {
       } else {
         await db
           .update(driverInstancesTable)
-          .set(
-            state === "stale heartbeat"
-              ? { lastHeartbeatAt: Date.now() - RUNTIME_SOCKET_TIMEOUT_MS - 1_000 }
-              : { generation: GENERATION + 1 },
-          )
+          .set({ lastHeartbeatAt: Date.now() - RUNTIME_SOCKET_TIMEOUT_MS - 1_000 })
           .where(eq(driverInstancesTable.id, DRIVER_INSTANCE_ID))
           .run();
       }
@@ -301,28 +292,55 @@ describe("driver MCP proxy route", () => {
     expect(captured).toHaveLength(0);
   });
 
-  test.each([undefined, null, "1", -1, 1.5, Number.MAX_SAFE_INTEGER + 1])(
-    "rejects a signed grant with invalid driver generation %s",
-    async (driverGeneration) => {
-      const { bindings, database } = await setupFixture();
-      const grant = await createRuntimeActionToken(bindings, {
-        action: "mcp_proxy",
-        driverGeneration,
-        driverInstanceId: DRIVER_INSTANCE_ID,
-        expiresAt: Date.now() + 60_000,
-        resourceId: SERVER_ID,
-      } as unknown as RuntimeActionTokenPayload);
-      const captured = captureUpstreamFetch();
-      const prepare = spyOn(database, "prepare");
-      try {
-        const response = await dispatch(bindings, grant);
+  test("rejects the stopped instance's grant after a replacement instance becomes ready", async () => {
+    const { bindings, database, grant } = await setupFixture();
+    const db = database.app();
+    const driver = await db
+      .select()
+      .from(driverInstancesTable)
+      .where(eq(driverInstancesTable.id, DRIVER_INSTANCE_ID))
+      .get();
+    const mcpGrant = await db
+      .select()
+      .from(driverInstanceMcpGrantsTable)
+      .where(eq(driverInstanceMcpGrantsTable.driverInstanceId, DRIVER_INSTANCE_ID))
+      .get();
+    if (!driver || !mcpGrant) throw new Error("Missing driver fixture.");
+    expect(
+      await finalizeDriverInstance(bindings, DRIVER_INSTANCE_ID, {
+        connectionId: CONNECTION_ID,
+        heartbeatCount: 0,
+        status: "stopped",
+      }),
+    ).toBe(true);
+    const replacementId = parsePlatformId<DriverInstanceId>(
+      "01J00000000000000000000103",
+      "replacement driver instance ID",
+    );
+    await db
+      .insert(driverInstancesTable)
+      .values({
+        ...driver,
+        id: replacementId,
+        bootTokenHash: new TextEncoder().encode(replacementId),
+        connectionId: "replacement-connection",
+      })
+      .run();
+    await db
+      .insert(driverInstanceMcpGrantsTable)
+      .values({ ...mcpGrant, driverInstanceId: replacementId })
+      .run();
+    const replacementGrant = await createRuntimeActionToken(bindings, {
+      action: "mcp_proxy",
+      driverInstanceId: replacementId,
+      expiresAt: Date.now() + 60_000,
+      resourceId: SERVER_ID,
+    });
+    const captured = captureUpstreamFetch();
 
-        expect(response.status).toBe(401);
-        expect(captured).toHaveLength(0);
-        expect(prepare).not.toHaveBeenCalled();
-      } finally {
-        prepare.mockRestore();
-      }
-    },
-  );
+    expect((await dispatch(bindings, grant)).status).toBe(403);
+    expect(captured).toHaveLength(0);
+    expect((await dispatch(bindings, replacementGrant)).status).toBe(200);
+    expect(captured).toHaveLength(1);
+  });
 });

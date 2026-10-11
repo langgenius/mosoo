@@ -264,6 +264,7 @@ describe("available models", () => {
       entries.find((entry) => entry.vendorId === "gemini" && entry.modelId === "gemini-3.5-flash"),
     ).toMatchObject({
       available: true,
+      modelProtocol: "google-gemini",
       statusDetail: null,
       statusLabel: "Available",
     });

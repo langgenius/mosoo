@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
+import { PLATFORM_ID_FIXTURES } from "@mosoo/id/testing";
+import { createRuntimeEvent } from "@mosoo/runtime-events";
+import type { RuntimeEventKind } from "@mosoo/runtime-events";
+
 import { loadSessionViewerState } from "../src/modules/sessions/infrastructure/session-viewer-live-snapshot.repository";
 import { SqliteD1Database } from "./helpers/sqlite-d1";
 
@@ -56,6 +60,16 @@ function createSessionViewerStateDatabase(): SqliteD1Database {
       segments_json text,
       seq integer NOT NULL,
       session_id text NOT NULL
+    );
+
+    CREATE TABLE session_event (
+      canonical_event_json text,
+      event_type text NOT NULL,
+      id text,
+      occurred_at integer,
+      seq integer NOT NULL,
+      session_id text NOT NULL,
+      visibility text NOT NULL
     );
 
     CREATE TABLE file_record (
@@ -196,6 +210,67 @@ function createSessionViewerStateDatabase(): SqliteD1Database {
 }
 
 describe("session viewer state", () => {
+  test("replays durable reasoning chunks across pages after cancellation and ignores previews", async () => {
+    const database = createSessionViewerStateDatabase();
+    const sessionId = PLATFORM_ID_FIXTURES.session;
+    const runId = PLATFORM_ID_FIXTURES.sessionRun;
+    database.execute(`
+      UPDATE session SET id = '${sessionId}', last_run_id = '${runId}';
+      UPDATE session_run SET id = '${runId}', session_id = '${sessionId}';
+      UPDATE session_message SET session_id = '${sessionId}';
+    `);
+    let seq = 0;
+    const persist = async (kind: RuntimeEventKind, payload: unknown, schemaVersion?: string) => {
+      seq++;
+      const event = createRuntimeEvent({
+        delivery: kind === "thought.delta" ? "best_effort" : "lossless",
+        id: PLATFORM_ID_FIXTURES.runtimeEvent,
+        kind,
+        occurredAt: new Date(seq * 1000).toISOString(),
+        payload,
+        runId,
+        sessionId,
+      });
+      await database
+        .prepare(`INSERT INTO session_event
+        (canonical_event_json, event_type, id, occurred_at, seq, session_id, visibility)
+        VALUES (?, ?, ?, ?, ?, ?, 'all_consumers')`)
+        .bind(
+          JSON.stringify({ ...event, ...(schemaVersion === undefined ? {} : { schemaVersion }) }),
+          kind,
+          event.id,
+          seq * 1000,
+          seq,
+          sessionId,
+        )
+        .run();
+    };
+
+    await persist("thought.started", { thoughtId: "first" });
+    await persist("thought.delta", { thoughtId: "first", contentDelta: "discarded preview" });
+    await persist("thought.updated", { thoughtId: "first", content: "😀", offset: 0 });
+    await persist("thought.started", { thoughtId: "second" });
+    await persist("thought.updated", { thoughtId: "second", content: "", offset: 0 });
+    await persist("thought.completed", { thoughtId: "second" });
+    for (let index = 0; index < 130; index++) {
+      await persist("thought.updated", { thoughtId: "first", content: "x", offset: 2 + index });
+    }
+    await persist("thought.cancelled", { thoughtId: "first" });
+    await persist("thought.delta", { thoughtId: "first", contentDelta: "late preview" });
+    await persist("thought.started", { thoughtId: "historical" }, "2026-08-29");
+    await persist("thought.completed", { thoughtId: "historical" }, "2026-08-29");
+
+    const state = await loadSessionViewerState(database, { sessionId, viewerId: "viewer-1" });
+    expect(state.messages.map((message) => message.id)).toEqual(["message-1", "first", "second"]);
+    expect(state.messages[1]).toMatchObject({
+      createdAt: new Date(1000).toISOString(),
+      segments: [{ kind: "reasoning", status: "completed", text: `😀${"x".repeat(130)}` }],
+    });
+    expect(state.messages[2]?.segments).toEqual([
+      { kind: "reasoning", status: "completed", text: "" },
+    ]);
+  });
+
   test("loads session, latest run, files, and messages", async () => {
     const database = createSessionViewerStateDatabase();
 

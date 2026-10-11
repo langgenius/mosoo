@@ -7,7 +7,7 @@ import type { ApiBindings } from "../../../platform/cloudflare/worker-types";
 import { isTruthy } from "../../../shared/truthiness";
 import { readSecret } from "../../vault/application/vault-secret-store";
 import { getProjectCredentialRow } from "../../vendor-credentials/application/vendor-credential.repository";
-import { isDriverInstanceGenerationActive } from "../infrastructure/driver-instance/driver-instance-record.repository";
+import { isDriverInstanceActive } from "../infrastructure/driver-instance/driver-instance-record.repository";
 
 /**
  * Upstream target for one proxied model call. `apiKey` is the raw vendor
@@ -34,14 +34,10 @@ export class RuntimeLlmProxyError extends Error {
 export async function requireActiveRuntimeLlmProxyDriver(
   bindings: ApiBindings,
   input: {
-    driverGeneration: number;
     driverInstanceId: DriverInstanceId;
   },
 ): Promise<void> {
-  const driverIsActive = await isDriverInstanceGenerationActive(bindings.DB, {
-    driverInstanceId: input.driverInstanceId,
-    generation: input.driverGeneration,
-  });
+  const driverIsActive = await isDriverInstanceActive(bindings.DB, input.driverInstanceId);
 
   if (!driverIsActive) {
     throw new RuntimeLlmProxyError("LLM proxy grant driver instance is not active.", 403);

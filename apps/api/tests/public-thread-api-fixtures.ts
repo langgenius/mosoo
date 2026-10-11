@@ -152,6 +152,7 @@ export async function insertRuntimeEvent(
     .insert(sessionEventsTable)
     .values({
       agentId: PUBLIC_API_TEST_IDS.agent,
+      canonicalEventJson: JSON.stringify(event),
       contentText: projection.contentText,
       createdAt: input.occurredAt,
       endedAt: input.occurredAt,

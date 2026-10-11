@@ -15,7 +15,6 @@ export async function getLostPrewarmOwnershipError(
   input: {
     bootTokenHash: Uint8Array;
     driverInstanceId: DriverInstanceId;
-    generation: number;
   },
 ): Promise<DriverPrewarmProvisionSkippedError | null> {
   const stillOwnsRecord = await driverInstanceRecordMatchesBootToken(env.DB, input);
