@@ -14,6 +14,7 @@ import type {
   PublicThreadCreationSource,
 } from "../../../modules/public-api/public-thread.types";
 import type { ApiGatewayEnvironment } from "../../../platform/cloudflare/worker-types";
+import { publicApiAnalyticsMiddleware } from "../public-api-analytics.middleware";
 import { createPublicApiOpenApiDocument } from "./public-api-openapi";
 import {
   requirePublicApiCaller,
@@ -375,6 +376,7 @@ function registerPublicThreadRoutes(
 export function registerPublicApiRoute(app: Hono<ApiGatewayEnvironment>) {
   for (const apiVersion of ["v1", "v2"] as const) {
     const routes = new Hono<ApiGatewayEnvironment>();
+    routes.use("*", publicApiAnalyticsMiddleware(apiVersion));
     routes.get("/openapi.json", (c) =>
       c.json(createPublicApiOpenApiDocument(new URL(c.req.url).origin, apiVersion)),
     );

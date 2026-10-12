@@ -1,6 +1,8 @@
+import { logWarn } from "../cloudflare/logger";
 import type { ApiBindings } from "../cloudflare/worker-types";
 
 export const SERVER_PRODUCT_ANALYTICS_EVENTS = {
+  apiRequestCompleted: "api_request_completed",
   agentCreated: "agent_created",
   projectCreated: "project_created",
   sandboxCreated: "sandbox_created",
@@ -40,7 +42,7 @@ export async function captureServerProductEvent(
   );
 
   try {
-    await fetch(`${bindings.POSTHOG_API_HOST}/capture/`, {
+    const response = await fetch(`${bindings.POSTHOG_API_HOST}/capture/`, {
       body: JSON.stringify({
         api_key: projectKey,
         event: input.event,
@@ -49,8 +51,16 @@ export async function captureServerProductEvent(
       }),
       headers: { "Content-Type": "application/json" },
       method: "POST",
+      signal: AbortSignal.timeout(5_000),
     });
+    if (!response.ok) {
+      logWarn("product-analytics.capture_rejected", {
+        event: input.event,
+        status: response.status,
+      });
+    }
   } catch {
     // Analytics must never break the product's authoritative business path.
+    logWarn("product-analytics.capture_failed", { event: input.event });
   }
 }
