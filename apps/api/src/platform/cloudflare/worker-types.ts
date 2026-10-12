@@ -1,4 +1,5 @@
 import type { ApiCommandMessage } from "../../modules/api-command/application/api-command-message";
+import type { PersonalAccessTokenCaller } from "../../modules/auth/application/personal-access-token.service";
 
 interface ApiCommandQueueBinding {
   API_COMMAND_QUEUE: Queue<ApiCommandMessage>;
@@ -43,4 +44,7 @@ export type ApiBindings = Env &
 
 export interface ApiGatewayEnvironment {
   Bindings: ApiBindings;
+  Variables: {
+    publicApiCaller: PersonalAccessTokenCaller | undefined;
+  };
 }
