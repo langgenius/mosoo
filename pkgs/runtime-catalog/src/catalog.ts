@@ -184,6 +184,16 @@ const VENDOR_OPENCODE: RuntimeCatalogVendor = {
   vendorId: "opencode",
 };
 
+const VENDOR_OPENCODE_GO: RuntimeCatalogVendor = {
+  apiKeyEnvVar: "OPENCODE_GO_API_KEY",
+  authHeader: BEARER_AUTH,
+  defaultApiBase: "https://opencode.ai/zen/go/v1",
+  iconKey: "opencode",
+  label: "OpenCode Go",
+  openCodeProvider: { name: "OpenCode Go", npmPackage: "@ai-sdk/openai-compatible" },
+  vendorId: "opencode-go",
+};
+
 export const VENDORS: readonly RuntimeCatalogVendor[] = [
   VENDOR_ANTHROPIC,
   VENDOR_OPENAI,
@@ -195,6 +205,7 @@ export const VENDORS: readonly RuntimeCatalogVendor[] = [
   VENDOR_ZHIPU,
   VENDOR_MINIMAX,
   VENDOR_OPENCODE,
+  VENDOR_OPENCODE_GO,
 ];
 
 export const MODEL_DEFAULTS: Readonly<Record<string, string>> = {
@@ -204,6 +215,7 @@ export const MODEL_DEFAULTS: Readonly<Record<string, string>> = {
   kimi: "kimi-k2.6",
   minimax: "MiniMax-M3",
   opencode: "deepseek-v4-pro",
+  "opencode-go": "deepseek-v4-flash",
   openai: "gpt-5.5",
   qwen: "qwen3.7-plus",
   zhipu: "glm-4.7",
@@ -402,6 +414,60 @@ export const PRESET_MODELS: readonly RuntimeCatalogPresetModel[] = [
     protocol: "google-gemini",
     vendor: VENDOR_OPENCODE,
   },
+  {
+    displayName: "DeepSeek V4 Flash",
+    modelId: "deepseek-v4-flash",
+    protocol: "openai-chat-completions",
+    vendor: VENDOR_OPENCODE_GO,
+  },
+  {
+    displayName: "DeepSeek V4 Pro",
+    modelId: "deepseek-v4-pro",
+    protocol: "openai-chat-completions",
+    vendor: VENDOR_OPENCODE_GO,
+  },
+  {
+    displayName: "GLM 5.2",
+    modelId: "glm-5.2",
+    protocol: "openai-chat-completions",
+    vendor: VENDOR_OPENCODE_GO,
+  },
+  {
+    displayName: "Kimi K2.6",
+    modelId: "kimi-k2.6",
+    protocol: "openai-chat-completions",
+    vendor: VENDOR_OPENCODE_GO,
+  },
+  {
+    displayName: "Kimi K2.7 Code",
+    modelId: "kimi-k2.7-code",
+    protocol: "openai-chat-completions",
+    vendor: VENDOR_OPENCODE_GO,
+  },
+  {
+    displayName: "MiniMax M3",
+    modelId: "minimax-m3",
+    protocol: "anthropic-messages",
+    vendor: VENDOR_OPENCODE_GO,
+  },
+  {
+    displayName: "MiniMax M2.7",
+    modelId: "minimax-m2.7",
+    protocol: "anthropic-messages",
+    vendor: VENDOR_OPENCODE_GO,
+  },
+  {
+    displayName: "Qwen3.7 Plus",
+    modelId: "qwen3.7-plus",
+    protocol: "anthropic-messages",
+    vendor: VENDOR_OPENCODE_GO,
+  },
+  {
+    displayName: "GPT 5.6 Luna",
+    modelId: "gpt-5.6-luna",
+    protocol: "openai-responses",
+    vendor: VENDOR_OPENCODE_GO,
+  },
 ];
 
 const ALL_MODEL_PROTOCOLS: readonly PresetModelProtocol[] = [
@@ -421,6 +487,7 @@ const MULTI_PROVIDER_VENDORS: readonly RuntimeCatalogVendor[] = [
   VENDOR_ZHIPU,
   VENDOR_MINIMAX,
   VENDOR_OPENCODE,
+  VENDOR_OPENCODE_GO,
 ];
 
 export const RUNTIMES: readonly RuntimeCatalogRuntime[] = [

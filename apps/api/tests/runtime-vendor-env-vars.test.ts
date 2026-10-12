@@ -78,6 +78,7 @@ describe("runtime vendor proxy env vars", () => {
       sanitizeRuntimeVendorEnvVars({
         ANTHROPIC_API_KEY: "raw-anthropic-key",
         EXISTING_ENV: "kept",
+        OPENCODE_GO_API_KEY: "raw-go-key",
         OPENAI_BASE_URL: "https://attacker.example.com/v1",
         OPENCODE_CONFIG_CONTENT: '{"provider":{"openai":{"options":{"apiKey":"raw"}}}}',
         MOSOO_PI_CONFIG_CONTENT:

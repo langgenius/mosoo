@@ -190,6 +190,7 @@ export function piProxyProtocolResponse(protocol: PresetModelProtocol, tool: boo
 /** Real pinned Pi CLI, with all model traffic directed at the test's Host proxy. */
 export async function runPiProxyTurn(
   variables: Record<string, string>,
+  model = "pi-test",
 ): Promise<Record<string, unknown>[]> {
   const home = await mkdtemp(join(tmpdir(), "mosoo-pi-proxy-"));
   const agentDir = join(home, "pi");
@@ -216,7 +217,7 @@ export async function runPiProxyTurn(
       "--provider",
       "mosoo",
       "--model",
-      "pi-test",
+      model,
       "--offline",
       "--no-extensions",
       "--no-skills",
@@ -293,6 +294,7 @@ export async function runPiProxyTurn(
 /** Real pinned OpenCode CLI using Host-rendered provider configuration. */
 export async function runOpenCodeProxyTurn(
   variables: Record<string, string>,
+  model = "openai-compatible/pi-test",
 ): Promise<Record<string, unknown>[]> {
   const home = await mkdtemp(join(tmpdir(), "mosoo-opencode-proxy-"));
   const executable = fileURLToPath(
@@ -307,7 +309,7 @@ export async function runOpenCodeProxyTurn(
       "--format",
       "json",
       "--model",
-      "openai-compatible/pi-test",
+      model,
       "--title",
       "Protocol integration fixture",
       "Run the provided bash tool and then finish.",

@@ -267,10 +267,9 @@ function buildOpenCodeProviderConfig(input: OpenCodeProviderConfigInput): OpenCo
   return {
     models,
     name: provider.name,
-    npm:
-      input.vendor.vendorId === "openai-compatible"
-        ? OPENCODE_SDK_BY_PROTOCOL[input.modelProtocol]
-        : provider.npmPackage,
+    npm: ["openai-compatible", "opencode-go"].includes(input.vendor.vendorId)
+      ? OPENCODE_SDK_BY_PROTOCOL[input.modelProtocol]
+      : provider.npmPackage,
     options,
   };
 }

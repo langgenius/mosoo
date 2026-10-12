@@ -330,6 +330,18 @@ function buildLlmProxyUpstreamHeaders(incoming: Headers, target: RuntimeLlmProxy
     }
   }
 
+  if (target.vendor.vendorId === "opencode-go") {
+    // Bind Go routing/cache identity to the Host conversation, not a replaceable
+    // Driver or a sandbox-supplied header. The raw provider key stays in Host.
+    if (target.sessionId === undefined)
+      throw new RuntimeLlmProxyError("Go session is unavailable.", 403);
+    headers.set("User-Agent", target.userAgent);
+    headers.set("x-opencode-session", target.sessionId);
+    if (target.modelProtocol === "anthropic-messages" && !headers.has("anthropic-version")) {
+      headers.set("anthropic-version", "2023-06-01");
+    }
+  }
+
   const authHeader =
     target.vendor.vendorId === "openai-compatible" &&
     ["anthropic-messages", "google-gemini"].includes(target.modelProtocol)
@@ -576,6 +588,7 @@ export function registerDriverRoute(app: Hono<ApiGatewayEnvironment>) {
     try {
       target = await resolveRuntimeLlmProxyTarget(c.env, {
         credentialId: grant.resourceId,
+        driverInstanceId: grant.driverInstanceId,
         modelProtocol: grant.modelProtocol,
         projectId: grant.projectId,
       });

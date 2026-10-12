@@ -159,3 +159,16 @@ describe("default agent runtime", () => {
     });
   });
 });
+
+test("Given only a Go credential, When launching an Agent, Then OpenCode uses a Go model", () => {
+  expect(resolveDefaultAgentRuntime([credential("opencode-go")])).toEqual({
+    model: "deepseek-v4-flash",
+    provider: "opencode-go",
+    runtimeId: "acp-fallback",
+  });
+  expect(resolveDefaultAgentRuntime([credential("opencode-go")], "pi")).toEqual({
+    model: "deepseek-v4-flash",
+    provider: "opencode-go",
+    runtimeId: "pi",
+  });
+});
