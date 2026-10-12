@@ -59,6 +59,7 @@ export async function requirePublicApiCaller(
     );
   }
 
+  c.set("publicApiCaller", caller);
   logInfo("public-api.authenticated", {
     accountId: caller.viewer.id,
     projectId: caller.viewer.projectId ?? null,
