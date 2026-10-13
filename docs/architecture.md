@@ -79,6 +79,7 @@ flowchart LR
   Follow-up admission, idle reclamation and per-Session maintenance wait for that committed boundary.
   The instance completion RPC only confirms an already committed canonical completion; it cannot synthesize success.
 - **Event acknowledgments:** a receipt names the exact canonical event already stored in D1.
+  Retries preserve the event ID, timestamp and content from the first delivery attempt.
   A repeated source ID with identical content returns its original sequence before any bundle read; changed content or a competing terminal outcome returns a terminal conflict.
   Lost acknowledgments never require a cleaned-up local bundle to be recreated.
 - **Retention:** the latest committed checkpoint is kept while the Session exists (`SANDBOX_BACKUP_TTL_SECONDS`), survives archive, and is deleted with the Session.

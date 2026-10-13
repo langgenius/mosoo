@@ -315,7 +315,7 @@ export const PUBLIC_API_OPENAPI_SCHEMAS = {
       },
       truncated: {
         description:
-          "True when older events exist beyond the returned window because the requested limit was reached.",
+          "True when older events exist beyond the returned window because the requested event limit or the history read budget was reached.",
         type: "boolean",
       },
     },

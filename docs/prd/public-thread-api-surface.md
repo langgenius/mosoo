@@ -31,6 +31,8 @@ The HTTP contract an application backend uses to run work on mosoo: start a Thre
 - v2 has no Project-wide Thread list. A Thread created inline has no Agent, so only its ID reaches it; store the ID.
 - An `inline` source carries no Skills or MCP servers; use a preset for those.
 - Event reads return at most the latest `PUBLIC_THREAD_EVENTS_MAX_LIMIT` events and have no cursor for older ones, so a caller that falls further behind cannot re-read the gap.
+  The history window also respects `SESSION_EVENT_WINDOW_MAX_BYTES`; list responses report `truncated` when older content is omitted.
+  A thought whose first content chunk falls outside the window is omitted.
 
 ## Compatibility
 

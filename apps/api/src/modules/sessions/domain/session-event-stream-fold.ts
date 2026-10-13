@@ -1,10 +1,4 @@
 import type { RuntimeEventId, SessionRunId } from "@mosoo/id";
-import {
-  isRuntimeEventRecord,
-  parseRuntimeEventEnvelope,
-  readRuntimeEventString,
-  readRuntimeEventThoughtUpdate,
-} from "@mosoo/runtime-events";
 
 // Streamed text events (message.delta / thought.delta) are persisted one row
 // per fragment so every accepted source identity stays durable (#274). Reading
@@ -22,7 +16,6 @@ import {
 // them with a single row instead of rendering a duplicate.
 
 export interface StreamFoldableSessionEventRow {
-  canonical_event_json: string | null;
   content_text: string;
   ended_at: number;
   event_type: string;
@@ -31,6 +24,8 @@ export interface StreamFoldableSessionEventRow {
   process_type: string;
   run_id: SessionRunId | null;
   seq: number;
+  thought_id: string | null;
+  thought_offset: number | null;
   tokens: number | null;
 }
 
@@ -41,24 +36,21 @@ export interface StoredThoughtEvent {
 }
 
 export function readStoredThoughtEvent(
-  row: Pick<StreamFoldableSessionEventRow, "canonical_event_json" | "event_type" | "id">,
+  row: Pick<
+    StreamFoldableSessionEventRow,
+    "content_text" | "event_type" | "thought_id" | "thought_offset"
+  >,
 ): StoredThoughtEvent | null {
-  if (!row.event_type.startsWith("thought.") || row.canonical_event_json === null) {
+  if (!row.event_type.startsWith("thought.") || row.thought_id === null) {
     return null;
   }
-  const persisted: unknown = JSON.parse(row.canonical_event_json);
-  if (row.event_type === "thought.updated") {
-    return readRuntimeEventThoughtUpdate(parseRuntimeEventEnvelope(persisted));
-  }
-  // Persisted lifecycle events retain their original schema version.
-  const payload = isRuntimeEventRecord(persisted) ? persisted["payload"] : undefined;
   return {
     content:
-      readRuntimeEventString(payload, "contentDelta") ??
-      readRuntimeEventString(payload, "content") ??
-      "",
-    offset: null,
-    thoughtId: readRuntimeEventString(payload, "thoughtId") ?? row.id,
+      row.event_type === "thought.updated" || row.event_type === "thought.delta"
+        ? row.content_text
+        : "",
+    offset: row.thought_offset,
+    thoughtId: row.thought_id,
   };
 }
 
@@ -89,8 +81,9 @@ const terminalRunEventTypes = new Set(["run.cancelled", "run.completed", "run.fa
 
 interface OpenStreamGroup<R extends StreamFoldableSessionEventRow> {
   contentText: string;
+  firstRow: R | null;
+  lastRow: R | null;
   placeholder: string;
-  rows: R[];
   runId: SessionRunId | null;
 }
 
@@ -150,8 +143,9 @@ function createOpenStreamGroup<R extends StreamFoldableSessionEventRow>(
 ): OpenStreamGroup<R> {
   return {
     contentText: "",
+    firstRow: null,
+    lastRow: null,
     placeholder: classification.placeholder,
-    rows: [],
     runId: row.run_id,
   };
 }
@@ -161,7 +155,8 @@ function mergeStreamRow<R extends StreamFoldableSessionEventRow>(
   row: R,
   classification: StreamRowClassification,
 ): void {
-  group.rows.push(row);
+  group.firstRow ??= row;
+  group.lastRow = row;
 
   // Fragments that carried no text are persisted with the process-draft
   // placeholder; they mark stream boundaries and must not leak into the text.
@@ -178,10 +173,9 @@ function mergeStreamRow<R extends StreamFoldableSessionEventRow>(
 function createFoldedStreamRow<R extends StreamFoldableSessionEventRow>(
   group: OpenStreamGroup<R>,
 ): R | null {
-  const firstRow = group.rows[0];
-  const lastRow = group.rows[group.rows.length - 1];
+  const { firstRow, lastRow } = group;
 
-  if (firstRow === undefined || lastRow === undefined || group.contentText.length === 0) {
+  if (firstRow === null || lastRow === null || group.contentText.length === 0) {
     return null;
   }
 
@@ -193,9 +187,7 @@ function createFoldedStreamRow<R extends StreamFoldableSessionEventRow>(
   };
 }
 
-export function foldStreamedSessionEventRows<R extends StreamFoldableSessionEventRow>(
-  rows: readonly R[],
-): R[] {
+export function createStreamedSessionEventRowFolder<R extends StreamFoldableSessionEventRow>() {
   const output: (R | null)[] = [];
   const openGroups = new Map<string, OpenStreamGroup<R>>();
   const fragmentSegments = new Map<string, ClosedFragmentSegment[]>();
@@ -253,126 +245,143 @@ export function foldStreamedSessionEventRows<R extends StreamFoldableSessionEven
     };
   }
 
-  for (const row of rows) {
-    const storedThought = readStoredThoughtEvent(row);
-    if (storedThought !== null) {
-      const key = JSON.stringify([row.run_id, storedThought.thoughtId]);
-      let thought = thoughts.get(key);
+  function append(rows: readonly R[]): void {
+    for (const row of rows) {
+      const storedThought = readStoredThoughtEvent(row);
+      if (storedThought !== null) {
+        const key = JSON.stringify([row.run_id, storedThought.thoughtId]);
+        let thought = thoughts.get(key);
 
-      if (thought === undefined) {
-        thought = {
-          anchor: row,
-          canonical: false,
-          closed: false,
-          content: "",
-          nextOffset: null,
-          outputIndex: output.length,
-        };
-        thoughts.set(key, thought);
-        output.push(null);
-      }
+        if (thought === undefined) {
+          thought = {
+            anchor: row,
+            canonical: false,
+            closed: false,
+            content: "",
+            nextOffset: null,
+            outputIndex: output.length,
+          };
+          thoughts.set(key, thought);
+          output.push(null);
+        }
 
-      if (storedThought.offset !== null) {
-        const update = storedThought;
-        thought.canonical = true;
-        if (update.offset === 0) {
-          thought.content = update.content;
-          thought.nextOffset = update.content.length;
-        } else if (thought.nextOffset === null) {
-          // A bounded history window cannot reconstruct a missing first chunk.
-          thought.content = "";
-        } else {
-          if (update.offset !== thought.nextOffset) {
-            throw new Error("Persisted thought content chunks are not contiguous.");
+        if (storedThought.offset !== null) {
+          const update = storedThought;
+          thought.canonical = true;
+          if (update.offset === 0) {
+            thought.content = update.content;
+            thought.nextOffset = update.content.length;
+          } else if (thought.nextOffset === null) {
+            // A bounded history window cannot reconstruct a missing first chunk.
+            thought.content = "";
+          } else {
+            if (update.offset !== thought.nextOffset) {
+              throw new Error("Persisted thought content chunks are not contiguous.");
+            }
+            thought.content += update.content;
+            thought.nextOffset += update.content.length;
           }
-          thought.content += update.content;
-          thought.nextOffset += update.content.length;
+        } else if (row.event_type === "thought.delta") {
+          if (thought.canonical || thought.closed) {
+            continue;
+          }
+          thought.content += storedThought.content;
+        } else if (
+          row.event_type === "thought.completed" ||
+          row.event_type === "thought.cancelled"
+        ) {
+          thought.closed = true;
         }
-      } else if (row.event_type === "thought.delta") {
-        if (thought.canonical || thought.closed) {
-          continue;
-        }
-        thought.content += storedThought.content;
-      } else if (row.event_type === "thought.completed" || row.event_type === "thought.cancelled") {
-        thought.closed = true;
+
+        output[thought.outputIndex] =
+          thought.content.length === 0
+            ? null
+            : {
+                ...row,
+                content_text: thought.content,
+                occurred_at: thought.anchor.occurred_at,
+                seq: thought.anchor.seq,
+              };
+        continue;
       }
 
-      output[thought.outputIndex] =
-        thought.content.length === 0
-          ? null
-          : {
-              ...row,
-              content_text: thought.content,
-              occurred_at: thought.anchor.occurred_at,
-              seq: thought.anchor.seq,
-            };
-      continue;
-    }
+      const classification = streamRowClassifications[row.event_type];
 
-    const classification = streamRowClassifications[row.event_type];
-
-    if (classification === undefined) {
-      // A terminal run receipt flushes the run's interrupted streams, exactly
-      // like the pre-persistence compactor did, so a failed run still shows
-      // the text it managed to stream.
-      if (terminalRunEventTypes.has(row.event_type)) {
-        for (const [key, group] of openGroups) {
-          if (group.runId === row.run_id) {
-            openGroups.delete(key);
-            closeGroupAsFragment(key, group);
+      if (classification === undefined) {
+        // A terminal run receipt flushes the run's interrupted streams, exactly
+        // like the pre-persistence compactor did, so a failed run still shows
+        // the text it managed to stream.
+        if (terminalRunEventTypes.has(row.event_type)) {
+          for (const [key, group] of openGroups) {
+            if (group.runId === row.run_id) {
+              openGroups.delete(key);
+              closeGroupAsFragment(key, group);
+            }
           }
         }
-      }
 
-      output.push(row);
-      continue;
-    }
-
-    const key = `${row.run_id ?? ""}:${row.process_type}`;
-    const existing = openGroups.get(key) ?? null;
-
-    if (classification.phase === "started") {
-      if (existing !== null) {
-        openGroups.delete(key);
-        closeGroupAsFragment(key, existing);
-      }
-
-      const group = createOpenStreamGroup(row, classification);
-      mergeStreamRow(group, row, classification);
-      openGroups.set(key, group);
-      continue;
-    }
-
-    if (classification.phase === "added" && existing === null) {
-      // A snapshot with no open stream is either a complete standalone
-      // message (legacy compacted rows and non-streamed messages) or the
-      // authoritative copy of fragments that already closed; the supersede
-      // check keeps the first case verbatim.
-      closeGroupWithSnapshot(key, row.content_text === classification.placeholder ? null : row);
-
-      if (row.content_text === classification.placeholder) {
         output.push(row);
+        continue;
       }
-      continue;
+
+      const key = `${row.run_id ?? ""}:${row.process_type}`;
+      const existing = openGroups.get(key) ?? null;
+
+      if (classification.phase === "started") {
+        if (existing !== null) {
+          openGroups.delete(key);
+          closeGroupAsFragment(key, existing);
+        }
+
+        const group = createOpenStreamGroup(row, classification);
+        mergeStreamRow(group, row, classification);
+        openGroups.set(key, group);
+        continue;
+      }
+
+      if (classification.phase === "added" && existing === null) {
+        // A snapshot with no open stream is either a complete standalone
+        // message (legacy compacted rows and non-streamed messages) or the
+        // authoritative copy of fragments that already closed; the supersede
+        // check keeps the first case verbatim.
+        closeGroupWithSnapshot(key, row.content_text === classification.placeholder ? null : row);
+
+        if (row.content_text === classification.placeholder) {
+          output.push(row);
+        }
+        continue;
+      }
+
+      const group = existing ?? createOpenStreamGroup(row, classification);
+      mergeStreamRow(group, row, classification);
+
+      if (classification.phase === "added") {
+        openGroups.delete(key);
+        closeGroupWithSnapshot(key, createFoldedStreamRow(group));
+      } else if (classification.phase === "completed") {
+        openGroups.delete(key);
+        closeGroupAsFragment(key, group);
+      } else if (existing === null) {
+        openGroups.set(key, group);
+      }
     }
+  }
 
-    const group = existing ?? createOpenStreamGroup(row, classification);
-    mergeStreamRow(group, row, classification);
-
-    if (classification.phase === "added") {
-      openGroups.delete(key);
-      closeGroupWithSnapshot(key, createFoldedStreamRow(group));
-    } else if (classification.phase === "completed") {
-      openGroups.delete(key);
+  function finish(): R[] {
+    for (const [key, group] of openGroups) {
       closeGroupAsFragment(key, group);
-    } else if (existing === null) {
-      openGroups.set(key, group);
     }
+    openGroups.clear();
+    return output.filter((row): row is R => row !== null);
   }
 
-  for (const [key, group] of openGroups) {
-    closeGroupAsFragment(key, group);
-  }
+  return { append, finish };
+}
 
-  return output.filter((row): row is R => row !== null);
+export function foldStreamedSessionEventRows<R extends StreamFoldableSessionEventRow>(
+  rows: readonly R[],
+): R[] {
+  const folder = createStreamedSessionEventRowFolder<R>();
+  folder.append(rows);
+  return folder.finish();
 }

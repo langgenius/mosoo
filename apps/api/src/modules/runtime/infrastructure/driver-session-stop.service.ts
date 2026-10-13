@@ -46,18 +46,6 @@ export async function stopDriverSession(
       return;
     }
 
-    if (input.terminalRun !== undefined) {
-      const outcome = await setSessionRunStatus(bindings.DB, {
-        error: input.terminalRun.error ?? null,
-        ...(input.operationId !== undefined ? { operationId: input.operationId } : {}),
-        preserveSessionLifecycle: input.preserveSessionLifecycle === true,
-        runId: activeSessionRunId,
-        source: "runtime_operation",
-        status: input.terminalRun.status,
-      });
-      assertSessionRunTransition(outcome, "Driver stop");
-    }
-
     const released = await releaseRuntimeRunLease(bindings.DB, {
       driverInstanceId: input.driverInstanceId,
       expectedSessionRunId: activeSessionRunId,
@@ -71,12 +59,11 @@ export async function stopDriverSession(
     }
   }
 
-  if (activeDriver.status === "stopped" || activeDriver.status === "failed") {
-    await releaseLinkedRun();
-    return;
-  }
+  async function stopActiveDriver(): Promise<void> {
+    if (activeDriver.status === "stopped" || activeDriver.status === "failed") {
+      return;
+    }
 
-  try {
     if (activeDriver.status === "ready") {
       try {
         await sendDriverInstanceCommand(bindings, input.driverInstanceId, {
@@ -99,7 +86,26 @@ export async function stopDriverSession(
     }
 
     await failDriverInstance(bindings, input.driverInstanceId, input.reason);
+  }
+
+  try {
+    if (activeSessionRunId !== null && input.terminalRun !== undefined) {
+      // The socket finalizer must observe the requested outcome instead of failing this Run.
+      const outcome = await setSessionRunStatus(bindings.DB, {
+        error: input.terminalRun.error ?? null,
+        ...(input.operationId !== undefined ? { operationId: input.operationId } : {}),
+        preserveSessionLifecycle: input.preserveSessionLifecycle === true,
+        runId: activeSessionRunId,
+        source: "runtime_operation",
+        status: input.terminalRun.status,
+      });
+      assertSessionRunTransition(outcome, "Driver stop");
+    }
   } finally {
-    await releaseLinkedRun();
+    try {
+      await stopActiveDriver();
+    } finally {
+      await releaseLinkedRun();
+    }
   }
 }

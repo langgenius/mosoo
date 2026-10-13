@@ -1,7 +1,7 @@
 import type { DriverHeartbeatInput, DriverReadyInput } from "@mosoo/agent-driver/orpc";
 import { driverInstancesTable } from "@mosoo/db";
 import type { DriverInstanceId } from "@mosoo/id";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 
 import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { getAppDatabase } from "../../../../platform/db/drizzle";
@@ -147,7 +147,7 @@ export async function finalizeDriverInstance(
   input: {
     closeCode?: number | null;
     closeReason?: string | null;
-    connectionId: string;
+    connectionId: string | null;
     errorMessage?: string | null;
     heartbeatCount: number;
     lastHeartbeatAt?: string | null;
@@ -167,6 +167,7 @@ export async function finalizeDriverInstance(
       .set({
         closeCode: sql`COALESCE(${driverInstancesTable.closeCode}, ${input.closeCode ?? null})`,
         closeReason: sql`COALESCE(${driverInstancesTable.closeReason}, ${input.closeReason ?? null})`,
+        connectionId: sql`COALESCE(${driverInstancesTable.connectionId}, ${input.connectionId})`,
         errorMessage: sql`COALESCE(${driverInstancesTable.errorMessage}, ${input.errorMessage ?? null})`,
         expiresAt: driverInstanceExpiresAt(completedAt),
         heartbeatCount: input.heartbeatCount,
@@ -181,7 +182,15 @@ export async function finalizeDriverInstance(
       .where(
         and(
           eq(driverInstancesTable.id, driverInstanceId),
-          eq(driverInstancesTable.connectionId, input.connectionId),
+          or(
+            input.connectionId === null
+              ? undefined
+              : eq(driverInstancesTable.connectionId, input.connectionId),
+            and(
+              isNull(driverInstancesTable.connectionId),
+              inArray(driverInstancesTable.status, ["provisioning", "connecting"]),
+            ),
+          ),
           inArray(driverInstancesTable.status, LIVE_DRIVER_INSTANCE_STATUSES),
         ),
       )
@@ -191,24 +200,9 @@ export async function finalizeDriverInstance(
   return row !== null;
 }
 
-export async function getDriverInstanceStatus(
-  bindings: ApiBindings,
-  driverInstanceId: DriverInstanceId,
-): Promise<DriverInstanceStatus | null> {
-  const row =
-    (await getAppDatabase(bindings.DB)
-      .select({ status: driverInstancesTable.status })
-      .from(driverInstancesTable)
-      .where(eq(driverInstancesTable.id, driverInstanceId))
-      .limit(1)
-      .get()) ?? null;
-
-  return row?.status ?? null;
-}
-
 export async function getTerminalDriverInstanceStatusForConnection(
   bindings: ApiBindings,
-  input: { driverInstanceId: DriverInstanceId; connectionId: string },
+  input: { driverInstanceId: DriverInstanceId; connectionId: string | null },
 ): Promise<"failed" | "stopped" | null> {
   const row = await getAppDatabase(bindings.DB)
     .select({ status: driverInstancesTable.status })
@@ -216,7 +210,9 @@ export async function getTerminalDriverInstanceStatusForConnection(
     .where(
       and(
         eq(driverInstancesTable.id, input.driverInstanceId),
-        eq(driverInstancesTable.connectionId, input.connectionId),
+        input.connectionId === null
+          ? isNull(driverInstancesTable.connectionId)
+          : eq(driverInstancesTable.connectionId, input.connectionId),
       ),
     )
     .get();

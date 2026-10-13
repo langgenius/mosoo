@@ -1,8 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
 import type { RuntimeEventId, SessionRunId } from "@mosoo/id";
-import { parsePlatformId } from "@mosoo/id";
-import { createRuntimeEvent } from "@mosoo/runtime-events";
 import type { RuntimeEventKind } from "@mosoo/runtime-events";
 
 import { foldStreamedSessionEventRows } from "../src/modules/sessions/domain/session-event-stream-fold";
@@ -19,7 +17,6 @@ function row(input: {
   seq: number;
 }): StreamFoldableSessionEventRow {
   return {
-    canonical_event_json: null,
     content_text: input.content,
     ended_at: input.seq * 1000,
     event_type: input.eventType,
@@ -28,6 +25,8 @@ function row(input: {
     process_type: input.processType ?? "agent.message.delta",
     run_id: input.runId === undefined ? RUN_ID : input.runId,
     seq: input.seq,
+    thought_id: null,
+    thought_offset: null,
     tokens: null,
   };
 }
@@ -36,23 +35,9 @@ function thoughtRow(input: {
   content?: string;
   kind: RuntimeEventKind;
   offset?: number;
-  schemaVersion?: string;
   seq: number;
   thoughtId: string;
 }): StreamFoldableSessionEventRow {
-  const event = createRuntimeEvent({
-    id: parsePlatformId("01J00000000000000000000010"),
-    kind: input.kind,
-    occurredAt: new Date(input.seq * 1000).toISOString(),
-    payload: {
-      thoughtId: input.thoughtId,
-      ...(input.kind === "thought.delta" ? { contentDelta: input.content ?? "" } : {}),
-      ...(input.kind === "thought.updated"
-        ? { content: input.content ?? "", offset: input.offset ?? 0 }
-        : {}),
-    },
-    sessionId: parsePlatformId("01J0000000000000000000000B"),
-  });
   return {
     ...row({
       content: input.content ?? "Agent thinking updated.",
@@ -61,27 +46,23 @@ function thoughtRow(input: {
       processType: "agent.thinking.delta",
       seq: input.seq,
     }),
-    canonical_event_json: JSON.stringify({
-      ...event,
-      ...(input.schemaVersion === undefined ? {} : { schemaVersion: input.schemaVersion }),
-    }),
+    thought_id: input.thoughtId,
+    thought_offset: input.kind === "thought.updated" ? (input.offset ?? 0) : null,
   };
 }
 
 describe("session event stream folding", () => {
-  test("reads persisted thought identities from older runtime event schemas", () => {
+  test("groups thought previews by their persisted identity", () => {
     const folded = foldStreamedSessionEventRows([
       thoughtRow({
         kind: "thought.delta",
         thoughtId: "old",
         content: "Existing history",
-        schemaVersion: "2026-05-26",
         seq: 1,
       }),
       thoughtRow({
         kind: "thought.completed",
         thoughtId: "old",
-        schemaVersion: "2026-05-26",
         seq: 2,
       }),
     ]);

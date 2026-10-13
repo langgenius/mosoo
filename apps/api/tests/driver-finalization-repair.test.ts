@@ -3,6 +3,8 @@ import { describe, expect, spyOn, test } from "bun:test";
 import type { DriverInstanceId, SessionRunId } from "@mosoo/id";
 
 import { recordCanonicalSessionRunFailure } from "../src/modules/runtime/application/session-runs/session-run-terminal-failure.service";
+import { isDriverInstanceActive } from "../src/modules/runtime/infrastructure/driver-instance/driver-instance-record.repository";
+import { claimDriverInstanceByBootTokenHash } from "../src/modules/runtime/infrastructure/driver-instance/driver-instance-token.repository";
 import { DriverInstanceRuntimeState } from "../src/modules/runtime/infrastructure/driver-instance/runtime-state";
 import type { DriverInstanceRuntimeStateContext } from "../src/modules/runtime/infrastructure/driver-instance/runtime-state-store";
 import { DRIVER_INSTANCE_STATE_STORAGE_KEY } from "../src/modules/runtime/infrastructure/driver-instance/runtime-state-store";
@@ -220,14 +222,27 @@ async function readTerminalEvents(database: SqliteD1Database): Promise<TerminalE
     .then((result) => result.results ?? []);
 }
 
-async function createSocketCloseFinalizationFixture() {
+async function createSocketCloseFinalizationFixture(
+  connection: "connected" | "pending" | "unconnected" = "connected",
+) {
   const database = await createPublicHttpContractDatabase();
   await insertFinalizedDriverLeaseFixture(database);
   const bindings = createPublicHttpTestBindings(database) as ApiBindings;
   const driverInstanceId = PUBLIC_API_TEST_IDS.driverOwner as DriverInstanceId;
+  const connectionId = connection === "unconnected" ? null : "connection-finalized";
+  const status =
+    connection === "connected" ? "ready" : connection === "pending" ? "connecting" : "provisioning";
   await database
-    .prepare("UPDATE driver_instance SET status = 'ready' WHERE id = ?")
-    .bind(driverInstanceId)
+    .prepare(
+      "UPDATE driver_instance SET status = ?, connection_id = ?, boot_token_expires_at = ?, updated_at = ? WHERE id = ?",
+    )
+    .bind(
+      status,
+      connection === "connected" ? connectionId : null,
+      Date.now() + 60_000,
+      Date.now(),
+      driverInstanceId,
+    )
     .run();
   const stored = new Map<string, unknown>();
   let alarm: number | null = null;
@@ -250,10 +265,9 @@ async function createSocketCloseFinalizationFixture() {
   };
   const beforeRestart = new DriverInstanceRuntimeState({ storage });
   await beforeRestart.setDriverInstanceId(driverInstanceId);
-  await beforeRestart.recordAcceptedConnection({
-    connectionId: "connection-finalized",
-    traceId: null,
-  });
+  if (connectionId !== null) {
+    await beforeRestart.recordConnection({ connectionId, traceId: null });
+  }
   await beforeRestart.persistClose({
     at: new Date().toISOString(),
     code: 1006,
@@ -270,10 +284,30 @@ async function createSocketCloseFinalizationFixture() {
     });
     return { coordinator, state };
   }
-  return { database, driverInstanceId, restore, stored, readAlarm: () => alarm };
+  return { bindings, database, driverInstanceId, restore, stored, readAlarm: () => alarm };
 }
 
 describe("driver finalization repair", () => {
+  test.each(["pending", "unconnected"] as const)(
+    "revokes the %s connection before its boot token can finish connecting",
+    async (connection) => {
+      const fixture = await createSocketCloseFinalizationFixture(connection);
+      expect(await isDriverInstanceActive(fixture.database, fixture.driverInstanceId)).toBe(true);
+      const { coordinator } = await fixture.restore();
+      await coordinator.finalize();
+      expect(await isDriverInstanceActive(fixture.database, fixture.driverInstanceId)).toBe(false);
+      expect(
+        await claimDriverInstanceByBootTokenHash(fixture.bindings, new Uint8Array([1])),
+      ).toBeNull();
+      expect(
+        await fixture.database
+          .prepare("SELECT status FROM session_run WHERE id = ?")
+          .bind(FINALIZE_RUN_ID)
+          .first(),
+      ).toEqual({ status: "failed" });
+    },
+  );
+
   test("resumes event and lease cleanup after the terminal Run was already committed", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertFinalizedDriverLeaseFixture(database);
@@ -378,35 +412,38 @@ describe("driver finalization repair", () => {
     ).toHaveLength(1);
   });
 
-  test("retries after driver finalization commits but run repair fails", async () => {
-    const fixture = await createSocketCloseFinalizationFixture();
-    const { database, driverInstanceId } = fixture;
-    database.execute(`CREATE TRIGGER fail_run_terminal BEFORE UPDATE OF status ON session_run
+  test.each(["connected", "pending", "unconnected"] as const)(
+    "retries after a %s driver finalizes but run repair fails",
+    async (connection) => {
+      const fixture = await createSocketCloseFinalizationFixture(connection);
+      const { database, driverInstanceId } = fixture;
+      database.execute(`CREATE TRIGGER fail_run_terminal BEFORE UPDATE OF status ON session_run
       BEGIN SELECT RAISE(ABORT, 'injected run write failure'); END;`);
-    const { coordinator, state } = await fixture.restore();
-    await expect(coordinator.finalize()).rejects.toThrow();
-    expect(state.finalizationCompleted).toBe(false);
-    expect(fixture.readAlarm()).not.toBeNull();
-    expect(
-      await database
-        .prepare("SELECT status FROM driver_instance WHERE id = ?")
-        .bind(driverInstanceId)
-        .first(),
-    ).toEqual({ status: "failed" });
-    database.execute("DROP TRIGGER fail_run_terminal");
-    const restored = await fixture.restore();
-    await restored.coordinator.finalize();
-    expect(
-      await database
-        .prepare("SELECT status FROM session_run WHERE id = ?")
-        .bind(FINALIZE_RUN_ID)
-        .first(),
-    ).toEqual({ status: "failed" });
-    expect(
-      (await readTerminalEvents(database)).filter((event) => event.event_type === "run.failed"),
-    ).toHaveLength(1);
-    expect(fixture.readAlarm()).toBeNull();
-  });
+      const { coordinator, state } = await fixture.restore();
+      await expect(coordinator.finalize()).rejects.toThrow();
+      expect(state.finalizationCompleted).toBe(false);
+      expect(fixture.readAlarm()).not.toBeNull();
+      expect(
+        await database
+          .prepare("SELECT status FROM driver_instance WHERE id = ?")
+          .bind(driverInstanceId)
+          .first(),
+      ).toEqual({ status: "failed" });
+      database.execute("DROP TRIGGER fail_run_terminal");
+      const restored = await fixture.restore();
+      await restored.coordinator.finalize();
+      expect(
+        await database
+          .prepare("SELECT status FROM session_run WHERE id = ?")
+          .bind(FINALIZE_RUN_ID)
+          .first(),
+      ).toEqual({ status: "failed" });
+      expect(
+        (await readTerminalEvents(database)).filter((event) => event.event_type === "run.failed"),
+      ).toHaveLength(1);
+      expect(fixture.readAlarm()).toBeNull();
+    },
+  );
 
   test("retries a failed driver write in the same object", async () => {
     const fixture = await createSocketCloseFinalizationFixture();

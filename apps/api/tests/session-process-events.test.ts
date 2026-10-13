@@ -96,6 +96,9 @@ function createProcessEventQueryDatabase(): SqliteD1Database {
       run_id text,
       seq integer NOT NULL,
       session_id text NOT NULL,
+      tool_call_id text,
+      tool_input_json text,
+      tool_name text,
       tokens integer,
       visibility text NOT NULL
     );

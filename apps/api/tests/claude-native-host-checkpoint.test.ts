@@ -400,11 +400,14 @@ test.skipIf(process.env.MOSOO_NATIVE_HOST_CHECKPOINT !== "1")(
             ...boot.execution,
             provider: "anthropic",
             model: "claude-sonnet-4-5",
+            modelConnection: {
+              protocol: "anthropic-messages",
+              proxyUrl: model.url.origin,
+              proxyGrant: "fixture-only",
+            },
             configRevision: { ...boot.execution.configRevision, runId: null, sessionId },
             environment: {
               variables: {
-                ANTHROPIC_API_KEY: "fixture-only",
-                ANTHROPIC_BASE_URL: model.url.origin,
                 CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
                 DISABLE_ERROR_REPORTING: "1",
                 DISABLE_TELEMETRY: "1",

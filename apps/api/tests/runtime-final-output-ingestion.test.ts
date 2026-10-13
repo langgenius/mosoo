@@ -28,8 +28,11 @@ import { getSessionRunSummary } from "../src/modules/runtime/infrastructure/sess
 import { setSessionRunStatus } from "../src/modules/runtime/infrastructure/session-runs/session-run-write.repository";
 import { createSessionRuntimeEvent } from "../src/modules/sessions/application/session-event-write.service";
 import { loadSessionViewerState } from "../src/modules/sessions/application/session-live-state.service";
-import { createSessionProcessEventsFromSessionEventRows } from "../src/modules/sessions/application/session-process-events.service";
-import type { SessionEventProcessRow } from "../src/modules/sessions/application/session-process-events.service";
+import { createSessionProcessEventsFromFoldedRows } from "../src/modules/sessions/application/session-process-events.service";
+import {
+  readFoldedSessionEventRows,
+  readSessionEventWindow,
+} from "../src/modules/sessions/infrastructure/session-event-read.repository";
 import { persistSessionRuntimeEvents } from "../src/modules/sessions/infrastructure/session-runtime-event-store.repository";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
@@ -1264,15 +1267,19 @@ describe("runtime final output ingestion", () => {
 
       const rows = await database
         .prepare(
-          `SELECT canonical_event_json, content_text, ended_at, event_type, id, occurred_at, process_status,
-                process_type, run_id, seq, tokens
+          `SELECT content_text, event_type
          FROM session_event
          WHERE session_id = ? AND run_id = ?
          ORDER BY seq`,
         )
         .bind(SESSION_ID, RUN_ID)
-        .all<SessionEventProcessRow>();
-      const assistantMessages = createSessionProcessEventsFromSessionEventRows(rows.results).filter(
+        .all<{ content_text: string; event_type: string }>();
+      const window = await readSessionEventWindow(database, {
+        rowLimit: 1000,
+        sessionId: SESSION_ID,
+      });
+      const folded = await readFoldedSessionEventRows(database, { sessionId: SESSION_ID, window });
+      const assistantMessages = createSessionProcessEventsFromFoldedRows(folded).filter(
         (event) => event.type === "agent.message.delta",
       );
 

@@ -1,29 +1,16 @@
 import { createProcessEventsTruncatedEventId } from "@mosoo/contracts/session";
 import type { SessionProcessEvent } from "@mosoo/contracts/session";
-import { sessionEventsTable } from "@mosoo/db";
-import type { ProjectId, RuntimeEventId, SessionId, SessionRunId } from "@mosoo/id";
-import { and, desc, eq } from "drizzle-orm";
+import type { ProjectId, SessionId, SessionRunId } from "@mosoo/id";
 
-import { getAppDatabase } from "../../../platform/db/drizzle";
 import { validationError } from "../../../platform/errors";
 import { toIsoString } from "../../../time";
 import type { AuthenticatedViewer } from "../../auth/application/viewer-auth.service";
 import { requireProjectSession } from "../domain/session-access.policy";
-import { foldStreamedSessionEventRows } from "../domain/session-event-stream-fold";
-
-export interface SessionEventProcessRow {
-  canonical_event_json: string | null;
-  content_text: string;
-  ended_at: number;
-  event_type: string;
-  id: RuntimeEventId;
-  occurred_at: number;
-  process_status: SessionProcessEvent["status"];
-  process_type: SessionProcessEvent["type"];
-  run_id: SessionRunId | null;
-  seq: number;
-  tokens: number | null;
-}
+import {
+  readFoldedSessionEventRows,
+  readSessionEventWindow,
+} from "../infrastructure/session-event-read.repository";
+import type { SessionEventProcessRow } from "../infrastructure/session-event-read.repository";
 
 const DEFAULT_PROCESS_EVENT_LIMIT = 500;
 const MAX_PROCESS_EVENT_LIMIT = 1000;
@@ -104,12 +91,10 @@ function toProcessEventProjectionFromSessionEventRow(
   };
 }
 
-export function createSessionProcessEventsFromSessionEventRows(
+export function createSessionProcessEventsFromFoldedRows(
   rows: SessionEventProcessRow[],
 ): SessionProcessEvent[] {
-  return finalizeProcessEventDurations(
-    foldStreamedSessionEventRows(rows).map(toProcessEventProjectionFromSessionEventRow),
-  );
+  return finalizeProcessEventDurations(rows.map(toProcessEventProjectionFromSessionEventRow));
 }
 
 function createProcessEventsTruncatedEvent(input: {
@@ -144,41 +129,18 @@ export async function getThreadSessionProcessEvents(
     projectId: input.projectId,
     sessionId: input.sessionId,
   });
-  const rows = await getAppDatabase(database)
-    .select({
-      canonical_event_json: sessionEventsTable.canonicalEventJson,
-      content_text: sessionEventsTable.contentText,
-      ended_at: sessionEventsTable.endedAt,
-      event_type: sessionEventsTable.eventType,
-      id: sessionEventsTable.id,
-      occurred_at: sessionEventsTable.occurredAt,
-      process_status: sessionEventsTable.processStatus,
-      process_type: sessionEventsTable.processType,
-      run_id: sessionEventsTable.runId,
-      seq: sessionEventsTable.seq,
-      tokens: sessionEventsTable.tokens,
-    })
-    .from(sessionEventsTable)
-    .where(
-      and(
-        eq(sessionEventsTable.sessionId, input.sessionId),
-        eq(sessionEventsTable.visibility, "all_consumers"),
-      ),
-    )
-    .orderBy(desc(sessionEventsTable.seq))
-    .limit(limit + 1)
-    .all();
+  const window = await readSessionEventWindow(database, {
+    rowLimit: limit,
+    sessionId: input.sessionId,
+  });
+  const rows = await readFoldedSessionEventRows(database, { sessionId: input.sessionId, window });
+  const processEvents = createSessionProcessEventsFromFoldedRows(rows);
 
-  const hasMore = rows.length > limit;
-  const processEvents = createSessionProcessEventsFromSessionEventRows(
-    rows.slice(0, limit).toReversed(),
-  );
-
-  if (!hasMore) {
+  if (!window.truncated) {
     return processEvents;
   }
 
-  const firstOccurredAt = processEvents[0]?.occurredAt ?? toIsoString(rows[limit - 1]!.occurred_at);
+  const firstOccurredAt = processEvents[0]?.occurredAt ?? toIsoString(window.oldestOccurredAt ?? 0);
 
   return [
     createProcessEventsTruncatedEvent({

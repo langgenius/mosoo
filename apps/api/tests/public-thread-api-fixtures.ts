@@ -120,6 +120,7 @@ function runtimeEventIdForSeq(seq: number): string {
 export async function insertRuntimeEvent(
   database: SqliteD1Database,
   input: {
+    id?: string;
     kind: RuntimeEventKind;
     occurredAt: number;
     payload: unknown;
@@ -133,7 +134,7 @@ export async function insertRuntimeEvent(
   const visibility = input.visibility ?? "participant";
   const databaseVisibility: SessionRuntimeEventVisibility =
     visibility === "participant" ? "all_consumers" : "owner_debug";
-  const eventId = runtimeEventIdForSeq(input.seq);
+  const eventId = input.id ?? runtimeEventIdForSeq(input.seq);
   const event = createRuntimeEvent({
     actor: "driver",
     id: eventId,

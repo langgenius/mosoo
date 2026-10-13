@@ -16,7 +16,7 @@ import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { isTruthy } from "../../../../shared/truthiness";
 import { decodeAndHashBootToken } from "../runtime-boot-token";
 import { claimDriverInstanceByBootTokenHash } from "./driver-instance-token.repository";
-import { getDriverInstanceStatus, markDriverInstanceConnected } from "./lifecycle";
+import { markDriverInstanceConnected } from "./lifecycle";
 import { createDriverInstanceRpcContext } from "./rpc";
 import type { DriverInstanceRpcControllers } from "./rpc";
 import { DriverInstanceRpcCommandController } from "./rpc-command-controller";
@@ -225,8 +225,8 @@ export class DriverInstance extends DurableObject {
       return Response.json({ error: "Boot token is invalid." }, { status: 401 });
     }
 
-    if (this.#state.terminalized) {
-      await this.#state.resetForReuse();
+    if (this.#state.terminalized || isTruthy(this.#state.errorMessage)) {
+      return Response.json({ error: "Driver instance is closed." }, { status: 410 });
     }
 
     const claim = await claimDriverInstanceByBootTokenHash(this.env, bootTokenHash);
@@ -235,29 +235,33 @@ export class DriverInstance extends DurableObject {
       return Response.json({ error: "Boot token is invalid." }, { status: 401 });
     }
 
+    if (this.#state.terminalized || isTruthy(this.#state.errorMessage)) {
+      return Response.json({ error: "Driver instance is closed." }, { status: 410 });
+    }
+
     const connectionId = createPlatformId();
+    const traceparent = url.searchParams.get("traceparent");
+    const parsedTraceparent = isTruthy(traceparent) ? parseTraceparent(traceparent) : null;
+    // A stop during the D1 write must already know which connection it can retire.
+    await this.#state.recordConnection({
+      connectionId,
+      traceId: parsedTraceparent?.traceId ?? null,
+    });
     const connected = await markDriverInstanceConnected(this.env, {
       bootTokenHash,
       connectionId,
       driverInstanceId: this.#state.requireDriverInstanceId(),
     });
 
-    if (!connected) {
+    if (!connected || this.#state.terminalized || isTruthy(this.#state.errorMessage)) {
       return Response.json({ error: "Driver connection is no longer current." }, { status: 409 });
     }
 
-    const traceparent = url.searchParams.get("traceparent");
-    const parsedTraceparent = isTruthy(traceparent) ? parseTraceparent(traceparent) : null;
     const pair = new WebSocketPair();
     const [clientSocket, serverSocket] = [pair[0], pair[1]];
 
     this.#sockets.replaceDriverSockets();
     this.#sockets.acceptDriverSocket(serverSocket);
-
-    await this.#state.recordAcceptedConnection({
-      connectionId,
-      traceId: parsedTraceparent?.traceId ?? null,
-    });
 
     this.#withRuntimeLogContext(() => {
       logInfo("runtime.socket.accepted", {
@@ -282,11 +286,6 @@ export class DriverInstance extends DurableObject {
 
       if (this.#state.terminalized) {
         await this.#terminalState.finalize();
-        const status = await getDriverInstanceStatus(this.env, this.#state.driverInstanceId);
-
-        if (status === "provisioning" || status === "connecting" || status === "ready") {
-          await this.#state.resetForReuse();
-        }
       }
 
       return;

@@ -47,26 +47,22 @@ export class DriverInstanceTerminalStateCoordinator {
     const close = await this.#ensureCloseSnapshot();
     const status = getDriverInstanceTerminalStatus(this.#state.errorMessage, close.code);
     const connectionId = this.#state.connectionId;
-    const finalized = isTruthy(connectionId)
-      ? await finalizeDriverInstance(this.#env, driverInstanceId, {
-          closeCode: close.code,
-          closeReason: close.reason || null,
-          connectionId,
-          errorMessage: this.#state.errorMessage,
-          heartbeatCount: this.#state.heartbeatCount,
-          lastHeartbeatAt: this.#state.lastHeartbeat?.at ?? null,
-          status,
-        })
-      : false;
+    const finalized = await finalizeDriverInstance(this.#env, driverInstanceId, {
+      closeCode: close.code,
+      closeReason: close.reason || null,
+      connectionId,
+      errorMessage: this.#state.errorMessage,
+      heartbeatCount: this.#state.heartbeatCount,
+      lastHeartbeatAt: this.#state.lastHeartbeat?.at ?? null,
+      status,
+    });
 
     const terminalStatus = finalized
       ? status
-      : isTruthy(connectionId)
-        ? await getTerminalDriverInstanceStatusForConnection(this.#env, {
-            driverInstanceId,
-            connectionId,
-          })
-        : null;
+      : await getTerminalDriverInstanceStatusForConnection(this.#env, {
+          driverInstanceId,
+          connectionId,
+        });
 
     // A prior attempt may have committed the driver row and stopped before the
     // run/effect/lease repair. Only the same connection may retry.

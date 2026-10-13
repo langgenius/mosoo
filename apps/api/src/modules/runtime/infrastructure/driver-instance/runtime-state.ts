@@ -129,10 +129,7 @@ export class DriverInstanceRuntimeState {
     this.finalizationCompleted = true;
   }
 
-  async recordAcceptedConnection(input: {
-    connectionId: string;
-    traceId: string | null;
-  }): Promise<void> {
+  async recordConnection(input: { connectionId: string; traceId: string | null }): Promise<void> {
     this.connectionId = input.connectionId;
 
     if (input.traceId !== null) {
@@ -182,17 +179,6 @@ export class DriverInstanceRuntimeState {
     }
 
     return this.connectionId;
-  }
-
-  async resetForReuse(): Promise<void> {
-    const driverInstanceId = this.requireDriverInstanceId();
-    this.#applyStoredState({
-      ...createEmptyStoredState(),
-      driverInstanceId,
-    });
-    await this.#ctx.storage.deleteAll();
-    await this.#ctx.storage.deleteAlarm();
-    await this.#persistState();
   }
 
   async destroy(reason: string): Promise<void> {

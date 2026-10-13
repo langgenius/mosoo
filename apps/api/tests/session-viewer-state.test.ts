@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { PLATFORM_ID_FIXTURES } from "@mosoo/id/testing";
-import { createRuntimeEvent } from "@mosoo/runtime-events";
+import { createProcessDraftFromRuntimeEvent, createRuntimeEvent } from "@mosoo/runtime-events";
 import type { RuntimeEventKind } from "@mosoo/runtime-events";
 
 import { loadSessionViewerState } from "../src/modules/sessions/infrastructure/session-viewer-live-snapshot.repository";
@@ -64,6 +64,7 @@ function createSessionViewerStateDatabase(): SqliteD1Database {
 
     CREATE TABLE session_event (
       canonical_event_json text,
+      content_text text NOT NULL DEFAULT '',
       event_type text NOT NULL,
       id text,
       occurred_at integer,
@@ -233,10 +234,11 @@ describe("session viewer state", () => {
       });
       await database
         .prepare(`INSERT INTO session_event
-        (canonical_event_json, event_type, id, occurred_at, seq, session_id, visibility)
-        VALUES (?, ?, ?, ?, ?, ?, 'all_consumers')`)
+        (canonical_event_json, content_text, event_type, id, occurred_at, seq, session_id, visibility)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'all_consumers')`)
         .bind(
           JSON.stringify({ ...event, ...(schemaVersion === undefined ? {} : { schemaVersion }) }),
+          createProcessDraftFromRuntimeEvent(event).content,
           kind,
           event.id,
           seq * 1000,

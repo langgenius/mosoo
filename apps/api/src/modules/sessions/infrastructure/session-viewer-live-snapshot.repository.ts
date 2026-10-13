@@ -31,6 +31,7 @@ import {
   sessionSummaryWithLastRunColumns,
 } from "../application/session-summary-query.service";
 import { readStoredThoughtEvent } from "../domain/session-event-stream-fold";
+import { sessionEventThoughtColumns } from "./session-event-read.repository";
 import { listSessionMessages } from "./session-message-snapshot.repository";
 
 // Each content chunk is capped at 512 KiB, keeping raw replay pages near 8 MiB.
@@ -47,11 +48,12 @@ async function listSessionReasoningMessages(
   for (;;) {
     const rows = await getAppDatabase(database)
       .select({
-        canonical_event_json: sessionEventsTable.canonicalEventJson,
+        content_text: sessionEventsTable.contentText,
         event_type: sessionEventsTable.eventType,
         id: sessionEventsTable.id,
         occurred_at: sessionEventsTable.occurredAt,
         seq: sessionEventsTable.seq,
+        ...sessionEventThoughtColumns(),
       })
       .from(sessionEventsTable)
       .where(
