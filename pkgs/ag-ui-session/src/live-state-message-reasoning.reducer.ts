@@ -66,6 +66,8 @@ export function updateReasoningSnapshot(
   input: MosooSessionReasoningUpdatedValue,
 ): SessionLiveState {
   const current = state.messages.find((message) => message.id === input.messageId);
+  // A bounded history window can omit the first chunk of an older thought.
+  if (current === undefined && input.offset !== 0) return state;
   const reasoning = current?.segments.find((segment) => segment.kind === "reasoning");
   let text = input.content;
 

@@ -253,16 +253,24 @@ describe("session live-state transcript reducer", () => {
     expect(replayed.messages).toEqual(partial.messages);
   });
 
-  test("rejects incomplete or changed reasoning snapshots", () => {
+  test("omits thoughts missing their prefix and rejects conflicting snapshots", () => {
     const chunk = (content: string, offset = 0) =>
       parseServerCustomEvent(MOSOO_CUSTOM_EVENT.sessionReasoningUpdated.name, {
         content,
         messageId: "thought-1",
         offset,
       });
-    expect(() => applyAgUiEventsToSessionLiveState(baseState(), [chunk("suffix", 1)])).toThrow(
-      "offset zero",
-    );
+    const omitted = applyAgUiEventsToSessionLiveState(baseState(), [chunk("suffix", 1)]);
+    expect(omitted.messages).toEqual([]);
+    expect(
+      applyAgUiEventsToSessionLiveState(omitted, [
+        parseServerCustomEvent(MOSOO_CUSTOM_EVENT.sessionReasoningUpdated.name, {
+          content: "next thought",
+          messageId: "thought-2",
+          offset: 0,
+        }),
+      ]).messages[0]?.segments,
+    ).toEqual([{ kind: "reasoning", status: "snapshot", text: "next thought" }]);
     const partial = applyAgUiEventsToSessionLiveState(baseState(), [chunk("first")]);
     for (const invalid of [chunk("changed"), chunk("gap", 6)]) {
       expect(() => applyAgUiEventsToSessionLiveState(partial, [invalid])).toThrow("contiguous");

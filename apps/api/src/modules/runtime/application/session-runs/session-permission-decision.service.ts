@@ -7,7 +7,7 @@ import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import type { AuthenticatedViewer } from "../../../auth/application/viewer-auth.service";
 import { createSessionRuntimeEvent } from "../../../sessions/application/session-event-write.service";
 import { requireProjectSession } from "../../../sessions/domain/session-access.policy";
-import { loadSessionViewerState } from "../../../sessions/infrastructure/session-viewer-live-snapshot.repository";
+import { loadSessionState } from "../../../sessions/infrastructure/session-viewer-live-snapshot.repository";
 import { resolvePermissionRequest } from "./resolve-permission-request.service";
 type PermissionDecision = "allow_once" | "reject_once";
 
@@ -32,7 +32,7 @@ async function loadCurrentPermissionState(input: {
   sessionId: SessionId;
   viewer: AuthenticatedViewer;
 }): Promise<SessionLiveState> {
-  return loadSessionViewerState(input.bindings.DB, {
+  return loadSessionState(input.bindings.DB, {
     sessionId: input.sessionId,
     viewerId: input.viewer.id,
   });

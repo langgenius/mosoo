@@ -89,8 +89,10 @@ afterEach(() => {
   fetchSpy = null;
 });
 
-function createController(bindings: ApiBindings): DriverInstanceRpcEventIngestionController {
-  const state = new DriverInstanceRuntimeState({ storage: {} as never });
+function createController(
+  bindings: ApiBindings,
+  state = new DriverInstanceRuntimeState({ storage: {} as never }),
+): DriverInstanceRpcEventIngestionController {
   state.driverInstanceId = DRIVER_ID;
   state.hello = {} as never;
 
@@ -443,58 +445,173 @@ describe("runtime final output ingestion", () => {
     ).toEqual({ count: 0 });
   });
 
-  test("commits corrected reasoning snapshots across controller restarts and duplicate chunks", async () => {
+  test("checks escaped thought bytes across controller restarts", async () => {
     const database = await createPublicHttpContractDatabase();
     await insertRuntimeFixture(database);
     const bindings = createPublicHttpTestBindings(database);
-    const thought = (
-      kind: RuntimeEventKind,
-      payload: Record<string, unknown>,
-      sourceEventId: string,
-    ) =>
+    const content = "\u0000".repeat(64 * 1024);
+    const chunks = Math.floor(MAX_THOUGHT_CONTENT_BYTES / (content.length * 6));
+    const update = (text: string, offset: number, sourceEventId: string) =>
       runtimeEvent({
-        kind,
-        payload: { thoughtId: "thought-1", ...payload },
+        kind: "thought.updated",
+        payload: { thoughtId: "escaped", content: text, offset },
         sourceEventId,
       });
-    const preview = thought(
-      "thought.delta",
-      { contentDelta: "unconfirmed\n\n" },
-      "thought:preview",
+    await pushFreshController(
+      bindings,
+      Array.from({ length: chunks }, (_, index) =>
+        update(content, index * content.length, `escaped:${index}`),
+      ),
     );
-    const first = thought("thought.updated", { content: "Final😀", offset: 0 }, "thought:first");
-    const second = thought(
-      "thought.updated",
-      { content: "正文", offset: "Final😀".length },
-      "thought:second",
-    );
-    await pushFreshController(bindings, [preview]);
-    const firstReceipt = await pushFreshController(bindings, [first]);
-    expect(await pushFreshController(bindings, [first])).toEqual(firstReceipt);
+    const offset = chunks * content.length;
+    const remainder = MAX_THOUGHT_CONTENT_BYTES - offset * 6;
+    const last = "\u0000".repeat(Math.floor(remainder / 6)) + "x".repeat(remainder % 6);
+    await pushFreshController(bindings, [update(last, offset, "escaped:last")]);
     await expect(
-      pushFreshController(bindings, [
-        thought("thought.updated", { content: "gap", offset: 50 }, "thought:gap"),
-      ]),
-    ).rejects.toThrow("contiguous");
-    await pushFreshController(bindings, [second]);
-    await pushFreshController(bindings, [
-      thought("thought.cancelled", {}, "thought:cancelled"),
-      thought("thought.delta", { contentDelta: "late preview" }, "thought:late-preview"),
-    ]);
-
-    const state = await loadSessionViewerState(database, {
-      sessionId: SESSION_ID,
-      viewerId: PUBLIC_API_TEST_IDS.ownerAccount,
-    });
-    expect(state.messages.find((message) => message.id === "thought-1")?.segments).toEqual([
-      { kind: "reasoning", status: "completed", text: "Final😀正文" },
-    ]);
+      pushFreshController(bindings, [update("\u0000", offset + last.length, "escaped:overflow")]),
+    ).rejects.toThrow("content byte limit");
     expect(
       await database
         .prepare("SELECT COUNT(*) AS count FROM session_event WHERE event_type = 'thought.updated'")
         .first(),
-    ).toEqual({ count: 2 });
+    ).toEqual({ count: chunks + 1 });
   });
+
+  test("validates old thoughts outside the viewer window without retaining their text", async () => {
+    const database = await createPublicHttpContractDatabase();
+    await insertRuntimeFixture(database);
+    const bindings = createPublicHttpTestBindings(database);
+    const runtimeState = new DriverInstanceRuntimeState({ storage: {} as never });
+    const controller = createController(bindings, runtimeState);
+    await controller.handlePushEvents(
+      {
+        driverInstanceId: DRIVER_ID,
+        events: [
+          ...messageEvents({
+            messageId: createPlatformId<SessionMessageId>(),
+            sourcePrefix: "visible",
+            text: "Working.",
+          }),
+          runtimeEvent({
+            kind: "thought.updated",
+            payload: { thoughtId: "old", content: "😀\u0000", offset: 0 },
+            sourceEventId: "old:first",
+          }),
+        ],
+      },
+      activeContext,
+    );
+    expect(runtimeState.liveState?.messages.map((message) => message.content)).toEqual([
+      "Working.",
+    ]);
+
+    await persistSessionRuntimeEvents(database, {
+      records: Array.from({ length: 1000 }, (_, index) => {
+        const envelope = runtimeEvent({
+          kind: "thought.updated",
+          payload: { thoughtId: `recent-${index}`, content: "recent", offset: 0 },
+          sourceEventId: `recent:${index}`,
+        });
+        return {
+          event: envelope.event,
+          occurredAt: Date.parse(envelope.occurredAt),
+          sourceEventId: envelope.eventId,
+        };
+      }),
+      sessionId: SESSION_ID,
+    });
+    await pushFreshController(bindings, [
+      runtimeEvent({
+        kind: "thought.updated",
+        payload: { thoughtId: "old", content: "continued", offset: "😀\u0000".length },
+        sourceEventId: "old:continued",
+      }),
+    ]);
+    const viewerState = await loadSessionViewerState(database, {
+      sessionId: SESSION_ID,
+      viewerId: PUBLIC_API_TEST_IDS.ownerAccount,
+    });
+    expect(viewerState.messages.some((message) => message.id === "old")).toBe(false);
+    expect(viewerState.messages.some((message) => message.id === "recent-999")).toBe(true);
+    expect(
+      await database
+        .prepare("SELECT COUNT(*) AS count FROM session_event WHERE event_type = 'thought.updated'")
+        .first(),
+    ).toEqual({ count: 1002 });
+  });
+
+  test.each(["thought.completed", "thought.cancelled"] as const)(
+    "commits corrected reasoning across restarts and retries until %s",
+    async (terminalKind) => {
+      const database = await createPublicHttpContractDatabase();
+      await insertRuntimeFixture(database);
+      const bindings = createPublicHttpTestBindings(database);
+      const thought = (
+        kind: RuntimeEventKind,
+        payload: Record<string, unknown>,
+        sourceEventId: string,
+      ) =>
+        runtimeEvent({
+          kind,
+          payload: { thoughtId: "thought-1", ...payload },
+          sourceEventId,
+        });
+      const preview = thought(
+        "thought.delta",
+        { contentDelta: "unconfirmed\n\n" },
+        "thought:preview",
+      );
+      const first = thought("thought.updated", { content: "Final😀", offset: 0 }, "thought:first");
+      const second = thought(
+        "thought.updated",
+        { content: "正文", offset: "Final😀".length },
+        "thought:second",
+      );
+      await pushFreshController(bindings, [preview]);
+      await expect(pushFreshController(bindings, [second])).rejects.toThrow("contiguous");
+      const firstReceipt = await pushFreshController(bindings, [first]);
+      expect(await pushFreshController(bindings, [first])).toEqual(firstReceipt);
+      await expect(
+        pushFreshController(bindings, [
+          thought("thought.updated", { content: "gap", offset: 50 }, "thought:gap"),
+        ]),
+      ).rejects.toThrow("contiguous");
+      await expect(
+        pushFreshController(bindings, [
+          thought("thought.updated", { content: "changed", offset: 0 }, "thought:changed"),
+        ]),
+      ).rejects.toThrow("immutable");
+      await pushFreshController(bindings, [second]);
+      await pushFreshController(bindings, [
+        thought(terminalKind, {}, "thought:terminal"),
+        thought("thought.delta", { contentDelta: "late preview" }, "thought:late-preview"),
+      ]);
+      await expect(
+        pushFreshController(bindings, [
+          thought(
+            "thought.updated",
+            { content: "late", offset: "Final😀正文".length },
+            "thought:late",
+          ),
+        ]),
+      ).rejects.toThrow("immutable");
+
+      const state = await loadSessionViewerState(database, {
+        sessionId: SESSION_ID,
+        viewerId: PUBLIC_API_TEST_IDS.ownerAccount,
+      });
+      expect(state.messages.find((message) => message.id === "thought-1")?.segments).toEqual([
+        { kind: "reasoning", status: "completed", text: "Final😀正文" },
+      ]);
+      expect(
+        await database
+          .prepare(
+            "SELECT COUNT(*) AS count FROM session_event WHERE event_type = 'thought.updated'",
+          )
+          .first(),
+      ).toEqual({ count: 2 });
+    },
+  );
 
   test.each([
     undefined,

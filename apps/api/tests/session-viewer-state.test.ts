@@ -70,6 +70,9 @@ function createSessionViewerStateDatabase(): SqliteD1Database {
       occurred_at integer,
       seq integer NOT NULL,
       session_id text NOT NULL,
+      tool_call_id text,
+      tool_input_json text,
+      tool_name text,
       visibility text NOT NULL
     );
 

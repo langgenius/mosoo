@@ -2,7 +2,6 @@ import { EventType, MOSOO_CUSTOM_EVENT, createServerCustomEvent } from "@mosoo/a
 import type { SessionUsageSummary } from "@mosoo/ag-ui-session";
 import type { DriverEventEnvelope } from "@mosoo/agent-driver/events";
 import { parseDriverNativeRuntimeRef, parseNativeCheckpoint } from "@mosoo/agent-driver/runtime";
-import { MAX_THOUGHT_CONTENT_BYTES } from "@mosoo/agent-driver/runtime-events";
 import { parsePlatformId } from "@mosoo/id";
 import type { DriverInstanceId, SessionRunId } from "@mosoo/id";
 import {
@@ -10,7 +9,6 @@ import {
   readRuntimeEventPayload,
   readRuntimeEventPermissionRequest,
   readRuntimeEventString,
-  readRuntimeEventThoughtUpdate,
   readRuntimeRunPayload,
 } from "@mosoo/runtime-events";
 import type { RuntimeEventEnvelope } from "@mosoo/runtime-events";
@@ -20,7 +18,7 @@ import type { ApiBindings } from "../../../../platform/cloudflare/worker-types";
 import { isTruthy } from "../../../../shared/truthiness";
 import {
   applyAgUiEventToSessionLiveState,
-  loadSessionViewerState,
+  loadSessionState,
   projectRuntimeEventToSessionDeliveryEvents,
 } from "../../../sessions/application/session-live-state.service";
 import type {
@@ -51,6 +49,7 @@ import {
   recordRuntimeFileChanges,
   recordRuntimeSessionOutputDirectory,
 } from "./runtime-session-output-store";
+import { validateThoughtEvents } from "./thought-event-validation";
 
 function readTerminalPendingToolResult(event: RuntimeEventEnvelope): string | null {
   if (event.kind === "run.failed") {
@@ -130,6 +129,18 @@ export async function projectRuntimeDriverEvents(
     throw new Error("Runtime driver run event is missing a session run id.");
   }
 
+  const events = input.events.map((envelope) => {
+    input.assertCurrentConnection();
+    const event = parseRuntimeEventEnvelope(envelope.event);
+    assertRuntimeEventMatchesDriverLink(event, {
+      driverInstanceId: input.driverInstanceId,
+      link,
+    });
+    assertRuntimeEventMatchesDriverEnvelope(event, { eventId: envelope.eventId });
+    return { envelope, event };
+  });
+  await validateThoughtEvents(database, { events: events.map(({ event }) => event), sessionId });
+
   const currentLiveState =
     input.currentLiveState ?? (await loadStoredRuntimeLiveState(database, link));
 
@@ -163,17 +174,16 @@ export async function projectRuntimeDriverEvents(
     });
   }
 
-  for (const envelope of input.events) {
+  for (const { envelope, event } of events) {
     input.assertCurrentConnection();
-    const event = parseRuntimeEventEnvelope(envelope.event);
-    assertRuntimeEventMatchesDriverLink(event, {
-      driverInstanceId: input.driverInstanceId,
-      link,
-    });
-    assertRuntimeEventMatchesDriverEnvelope(event, {
-      eventId: envelope.eventId,
-    });
     appendCanonicalEvent(envelope, event);
+
+    if (event.kind.startsWith("thought.")) {
+      for (const liveEvent of projectRuntimeEventToSessionDeliveryEvents(event)) {
+        appendSessionDeliveryEvent(envelope, liveEvent);
+      }
+      continue;
+    }
 
     if (event.kind === "runtime.resume.updated") {
       const nativeResumeRef = readNativeResumeRef(event);
@@ -331,19 +341,6 @@ export async function projectRuntimeDriverEvents(
       appendSessionDeliveryEvent(envelope, liveEvent);
       liveStateChanged = true;
     }
-    if (event.kind === "thought.updated") {
-      const { thoughtId } = readRuntimeEventThoughtUpdate(event);
-      const reasoning = nextLiveState.messages
-        .find((message) => message.id === thoughtId)
-        ?.segments.find((segment) => segment.kind === "reasoning");
-      if (
-        reasoning !== undefined &&
-        new TextEncoder().encode(JSON.stringify(reasoning.text)).byteLength - 2 >
-          MAX_THOUGHT_CONTENT_BYTES
-      ) {
-        throw new Error("Reasoning snapshot exceeds the content byte limit.");
-      }
-    }
   }
 
   return {
@@ -421,7 +418,7 @@ async function loadStoredRuntimeLiveState(
     throw new Error("Runtime session link is missing a viewer principal.");
   }
 
-  return loadSessionViewerState(database, {
+  return loadSessionState(database, {
     sessionId: link.sessionId,
     viewerId,
   });

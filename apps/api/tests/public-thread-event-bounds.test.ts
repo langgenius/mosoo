@@ -4,6 +4,10 @@ import { MAX_THOUGHT_CONTENT_BYTES } from "@mosoo/agent-driver/runtime-events";
 
 import { createThoughtContentEvents } from "../../driver/src/runtimes/thought-content";
 import {
+  loadSessionState,
+  loadSessionViewerState,
+} from "../src/modules/sessions/application/session-live-state.service";
+import {
   readSessionEventRowsAfterSeq,
   readSessionEventWindow,
   SESSION_EVENT_PAGE_MAX_BYTES,
@@ -81,6 +85,19 @@ test("reads a complete 16 MiB thought and bounds large history by serialized byt
   expect(body["events"]).toEqual([
     expect.objectContaining({ content: finalText, type: "agent.thinking.delta" }),
   ]);
+
+  const viewerInput = { sessionId, viewerId: PUBLIC_API_TEST_IDS.ownerAccount };
+  const viewerState = await loadSessionViewerState(database, viewerInput);
+  expect(viewerState.messages).toEqual([
+    expect.objectContaining({
+      id: "thought-4",
+      segments: [{ kind: "reasoning", status: "completed", text: finalText }],
+    }),
+  ]);
+  expect(Buffer.byteLength(JSON.stringify(viewerState))).toBeLessThanOrEqual(
+    SESSION_EVENT_WINDOW_MAX_BYTES,
+  );
+  expect((await loadSessionState(database, viewerInput)).messages).toEqual([]);
 
   const window = await readSessionEventWindow(database, { rowLimit: 20_000, sessionId });
   expect(window.truncated).toBe(true);

@@ -12,7 +12,10 @@ export type {
   SessionPermissionRequestView,
   SessionViewSegment,
 } from "@mosoo/ag-ui-session";
-export { loadSessionViewerState } from "../infrastructure/session-viewer-live-snapshot.repository";
+export {
+  loadSessionState,
+  loadSessionViewerState,
+} from "../infrastructure/session-viewer-live-snapshot.repository";
 
 export type SessionDeliveryEvent = AgUiSessionEvent;
 

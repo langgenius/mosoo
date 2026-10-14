@@ -1,7 +1,7 @@
 import type { SessionProcessEventStatus, SessionProcessEventType } from "@mosoo/contracts/session";
 import { sessionEventsTable } from "@mosoo/db";
 import type { SessionId } from "@mosoo/id";
-import { and, asc, desc, eq, gt, lte, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, lte, lt, sql } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { createStreamedSessionEventRowFolder } from "../domain/session-event-stream-fold";
@@ -33,6 +33,7 @@ export function sessionEventThoughtColumns() {
 interface SessionEventReadRange {
   afterSeq?: number;
   beforeSeq?: number;
+  eventTypes?: readonly string[];
   throughSeq?: number;
   sessionId: SessionId;
 }
@@ -41,6 +42,9 @@ function rangeConditions(input: SessionEventReadRange) {
   return and(
     eq(sessionEventsTable.sessionId, input.sessionId),
     eq(sessionEventsTable.visibility, "all_consumers"),
+    input.eventTypes === undefined
+      ? undefined
+      : inArray(sessionEventsTable.eventType, input.eventTypes),
     input.afterSeq === undefined ? undefined : gt(sessionEventsTable.seq, input.afterSeq),
     input.beforeSeq === undefined ? undefined : lt(sessionEventsTable.seq, input.beforeSeq),
     input.throughSeq === undefined ? undefined : lte(sessionEventsTable.seq, input.throughSeq),
@@ -79,7 +83,7 @@ export interface SessionEventReadWindow {
 
 export async function readSessionEventWindow(
   database: D1Database,
-  input: { rowLimit: number; sessionId: SessionId },
+  input: { eventTypes?: readonly string[]; rowLimit: number; sessionId: SessionId },
 ): Promise<SessionEventReadWindow> {
   const window: SessionEventReadWindow = {
     latestSeq: null,
@@ -95,10 +99,10 @@ export async function readSessionEventWindow(
   for (;;) {
     const limit = Math.min(SESSION_EVENT_METADATA_PAGE_ROWS, input.rowLimit + 1 - rowCount);
     const rows = await readSessionEventMetadata(database, {
+      ...input,
       ...(beforeSeq === undefined ? {} : { beforeSeq }),
       descending: true,
       limit,
-      sessionId: input.sessionId,
     });
     for (const row of rows) {
       window.latestSeq ??= row.seq;

@@ -16,3 +16,5 @@ Where a Project owner sees Session work in the console: the **Runs** inbox for T
 - Pins and read markers live in the current browser and do not sync across devices.
 - Completion notifications need browser permission and work only while the Threads page is open.
 - Logs has no cross-Session search, pagination or export, and Sessions without an Agent have no Logs view.
+- Reconnecting a viewer restores recent recorded thinking within `REASONING_REPLAY_MAX_ROWS` and `SESSION_EVENT_WINDOW_MAX_BYTES`.
+  Thoughts whose first content chunk is outside that window are omitted from the view; their recorded events remain in the Session history.

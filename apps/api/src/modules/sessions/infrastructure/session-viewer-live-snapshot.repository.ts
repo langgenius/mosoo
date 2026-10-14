@@ -20,7 +20,7 @@ import {
   sessionsTable,
 } from "@mosoo/db";
 import type { PlatformId, SessionId } from "@mosoo/id";
-import { and, asc, eq, gt, inArray, isNotNull } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNotNull, lte } from "drizzle-orm";
 
 import { getAppDatabase } from "../../../platform/db/drizzle";
 import { toIsoString } from "../../../time";
@@ -31,18 +31,34 @@ import {
   sessionSummaryWithLastRunColumns,
 } from "../application/session-summary-query.service";
 import { readStoredThoughtEvent } from "../domain/session-event-stream-fold";
-import { sessionEventThoughtColumns } from "./session-event-read.repository";
+import {
+  readSessionEventWindow,
+  sessionEventThoughtColumns,
+} from "./session-event-read.repository";
 import { listSessionMessages } from "./session-message-snapshot.repository";
 
 // Each content chunk is capped at 512 KiB, keeping raw replay pages near 8 MiB.
 const REASONING_REPLAY_PAGE_SIZE = 16;
+const REASONING_REPLAY_MAX_ROWS = 1000;
+const REASONING_EVENT_TYPES = [
+  "thought.started",
+  "thought.updated",
+  "thought.completed",
+  "thought.cancelled",
+] as const;
 
 async function listSessionReasoningMessages(
   database: D1Database,
   sessionId: SessionId,
 ): Promise<SessionViewMessage[]> {
+  const window = await readSessionEventWindow(database, {
+    eventTypes: REASONING_EVENT_TYPES,
+    rowLimit: REASONING_REPLAY_MAX_ROWS,
+    sessionId,
+  });
+  if (window.oldestSeq === null || window.latestSeq === null) return [];
   let state = createInitialSessionLiveState({ sessionId, title: null, viewerId: "" });
-  let afterSeq = 0;
+  let afterSeq = window.oldestSeq - 1;
   const createdAtByThought = new Map<string, string>();
 
   for (;;) {
@@ -61,13 +77,9 @@ async function listSessionReasoningMessages(
           eq(sessionEventsTable.sessionId, sessionId),
           eq(sessionEventsTable.visibility, "all_consumers"),
           gt(sessionEventsTable.seq, afterSeq),
+          lte(sessionEventsTable.seq, window.latestSeq),
           isNotNull(sessionEventsTable.canonicalEventJson),
-          inArray(sessionEventsTable.eventType, [
-            "thought.started",
-            "thought.updated",
-            "thought.completed",
-            "thought.cancelled",
-          ]),
+          inArray(sessionEventsTable.eventType, REASONING_EVENT_TYPES),
         ),
       )
       .orderBy(asc(sessionEventsTable.seq))
@@ -169,14 +181,16 @@ function toCanonicalLifecycleStatus(
   return sessionStatus;
 }
 
-export async function loadSessionViewerState(
+interface SessionStateInput {
+  sessionId: SessionId;
+  viewerId: PlatformId;
+}
+
+export async function loadSessionState(
   database: D1Database,
-  input: {
-    sessionId: SessionId;
-    viewerId: PlatformId;
-  },
+  input: SessionStateInput,
 ): Promise<SessionLiveState> {
-  const [sessionRow, messages, reasoningMessages, permissionRequests, files] = await Promise.all([
+  const [sessionRow, messages, permissionRequests, files] = await Promise.all([
     getAppDatabase(database)
       .select(sessionSummaryWithLastRunColumns())
       .from(sessionsTable)
@@ -185,7 +199,6 @@ export async function loadSessionViewerState(
       .limit(1)
       .get(),
     listSessionMessages(database, input.sessionId),
-    listSessionReasoningMessages(database, input.sessionId),
     listPermissionRequests(database, input.sessionId),
     fileStore.listReadySessionFiles(database, input.sessionId),
   ]);
@@ -206,22 +219,35 @@ export async function loadSessionViewerState(
     }),
     files,
     lifecycle: toCanonicalLifecycleStatus(session.status, run.status),
-    messages: [
-      ...messages.map((message) => ({
-        content: message.content,
-        createdAt: message.createdAt,
-        id: message.id,
-        plan: message.plan,
-        role: message.role,
-        segments: message.segments,
-      })),
-      ...reasoningMessages,
-    ].toSorted((left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt)),
+    messages: messages.map((message) => ({
+      content: message.content,
+      createdAt: message.createdAt,
+      id: message.id,
+      plan: message.plan,
+      role: message.role,
+      segments: message.segments,
+    })),
     permissionRequests:
       latestRun === null || isTerminalSessionRunStatus(latestRun.status)
         ? []
         : permissionRequests.filter((request) => request.runId === latestRun.id),
     run,
     updatedAt: session.updatedAt,
+  };
+}
+
+export async function loadSessionViewerState(
+  database: D1Database,
+  input: SessionStateInput,
+): Promise<SessionLiveState> {
+  const [state, reasoningMessages] = await Promise.all([
+    loadSessionState(database, input),
+    listSessionReasoningMessages(database, input.sessionId),
+  ]);
+  return {
+    ...state,
+    messages: [...state.messages, ...reasoningMessages].toSorted(
+      (left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt),
+    ),
   };
 }
