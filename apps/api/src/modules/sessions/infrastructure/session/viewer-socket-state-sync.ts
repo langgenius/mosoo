@@ -24,11 +24,15 @@ export async function sendViewerSocketStateSync(
     return;
   }
 
-  const state = await loadSessionViewerState(database, {
-    sessionId: attachment.sessionId,
-    viewerId: attachment.viewer.id,
-  });
-  // Read after the load: frames broadcast meanwhile are re-applied on top of
-  // the snapshot that replaces the viewer's state.
-  sendFrames(socket, [JSON.stringify(createStateSnapshotEvent(state)), ...getReplayFrames()]);
+  while (socket.readyState === WebSocket.OPEN) {
+    const replayFrames = getReplayFrames();
+    const state = await loadSessionViewerState(database, {
+      sessionId: attachment.sessionId,
+      viewerId: attachment.viewer.id,
+    });
+    // A replaced buffer means frames were discarded while the snapshot loaded.
+    if (replayFrames !== getReplayFrames()) continue;
+    sendFrames(socket, [JSON.stringify(createStateSnapshotEvent(state)), ...replayFrames]);
+    return;
+  }
 }

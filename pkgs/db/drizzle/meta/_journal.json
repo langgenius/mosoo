@@ -141,6 +141,13 @@
       "when": 1791626317363,
       "tag": "0019_native_checkpoint_receipts",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1791972789576,
+      "tag": "0020_session-thought-lookup",
+      "breakpoints": true
     }
   ]
 }

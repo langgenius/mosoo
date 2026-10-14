@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, spyOn, test } from "bun:test";
 
 import {
   applyAgUiEventsToSessionLiveState,
@@ -8,7 +8,10 @@ import {
 import type { AgUiSessionEvent } from "@mosoo/ag-ui-session";
 import { parsePlatformId } from "@mosoo/id";
 import type { AccountId, ProjectId, SessionId } from "@mosoo/id";
+import { createRuntimeEvent } from "@mosoo/runtime-events";
 
+import { createThoughtContentEvents } from "../../driver/src/runtimes/thought-content";
+import { projectRuntimeEventToSessionDeliveryEvents } from "../src/modules/sessions/application/session-live-state.service";
 import { writeSessionViewerSocketHeaders } from "../src/modules/sessions/infrastructure/session/socket-headers";
 import { SessionViewerSocketHub } from "../src/modules/sessions/infrastructure/session/viewer-socket-hub";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
@@ -18,6 +21,7 @@ import {
   insertOwnerSession,
   PUBLIC_API_TEST_IDS,
 } from "./helpers/public-api-http-test-fixture";
+import { insertRuntimeEvent } from "./public-thread-api-fixtures";
 
 const SESSION_ID = parsePlatformId<SessionId>(PUBLIC_API_TEST_IDS.ownerSession, "session id");
 
@@ -93,7 +97,7 @@ async function createHub() {
     return sockets.at(-1)!;
   }
 
-  return { connect, hub };
+  return { connect, database, hub };
 }
 
 function receivedEvents(socket: TestViewerSocket): AgUiSessionEvent[] {
@@ -148,4 +152,75 @@ describe("Session viewer socket replay", () => {
     expect(receivedEvents(first).at(-1)?.type).toBe(EventType.STATE_SNAPSHOT);
     expect(receivedEvents(second).map((event) => event.type)).toEqual([EventType.STATE_SNAPSHOT]);
   });
+
+  test.each(["eviction", "clear"] as const)(
+    "reloads a snapshot when replay frames disappear during its read: %s",
+    async (mode) => {
+      const { connect, database, hub } = await createHub();
+      const content = "x".repeat(8 * 1024 * 1024);
+      const updates = createThoughtContentEvents("thought-1", content);
+      let seq = 0;
+      const persist = async (event: (typeof updates)[number]) => {
+        seq++;
+        const id = seq.toString().padStart(26, "0");
+        await insertRuntimeEvent(database, {
+          id,
+          kind: event.kind,
+          occurredAt: seq,
+          payload: event.payload,
+          seq,
+          sessionId: SESSION_ID,
+        });
+        return createRuntimeEvent({
+          id,
+          kind: event.kind,
+          occurredAt: new Date(seq).toISOString(),
+          payload: event.payload,
+          sessionId: SESSION_ID,
+        });
+      };
+      await persist(updates[0]);
+
+      let interrupted = false;
+      const prepare = database.prepare.bind(database);
+      const prepareSpy = spyOn(database, "prepare").mockImplementation((query) => {
+        const statement = prepare(query);
+        if (!query.includes('"canonical_event_json" is not null')) return statement;
+        const bind = statement.bind.bind(statement);
+        statement.bind = (...values) => {
+          const bound = bind(...values);
+          const raw = bound.raw;
+          bound.raw = async <T = unknown[]>(options?: { columnNames?: boolean }) => {
+            if (!interrupted) {
+              interrupted = true;
+              const events = [];
+              for (const update of updates.slice(1)) events.push(await persist(update));
+              events.push(
+                await persist({ kind: "thought.completed", payload: { thoughtId: "thought-1" } }),
+              );
+              await hub.broadcastEvents(events.flatMap(projectRuntimeEventToSessionDeliveryEvents));
+              if (mode === "clear") await hub.broadcastStateSync();
+            }
+            return raw<T>(options);
+          };
+          return bound;
+        };
+        return statement;
+      });
+
+      try {
+        const socket = await connect();
+        expect(interrupted).toBe(true);
+        const state = applyAgUiEventsToSessionLiveState(
+          createInitialSessionLiveState({ sessionId: SESSION_ID, title: null, viewerId: "" }),
+          receivedEvents(socket),
+        );
+        expect(state.messages.find((message) => message.id === "thought-1")?.segments).toEqual([
+          { kind: "reasoning", status: "completed", text: content },
+        ]);
+      } finally {
+        prepareSpy.mockRestore();
+      }
+    },
+  );
 });

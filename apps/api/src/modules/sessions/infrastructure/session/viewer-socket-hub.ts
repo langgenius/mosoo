@@ -17,8 +17,7 @@ import { sendViewerSocketStateSync } from "./viewer-socket-state-sync";
 
 declare const WebSocketPair: new () => [WebSocket, WebSocket];
 
-// Bounds the frames kept for replay so one long turn cannot exhaust Durable
-// Object memory; past it a (re)connecting viewer gets only the newest frames.
+// Bound replay memory; snapshot reads restart when frames are discarded.
 const MAX_REPLAY_FRAME_CHARS = 4 * 1024 * 1024;
 
 interface SessionViewerSocketHubOptions {
@@ -37,8 +36,7 @@ export class SessionViewerSocketHub {
   readonly #env: ApiBindings;
   readonly #rememberSessionId: (sessionId: string) => void;
   readonly #withSessionLogContext: <T>(fn: () => T) => T;
-  // D1 holds a turn's streamed output only once the turn ends, so a snapshot
-  // taken mid-turn is followed by the frames sent since the last state sync.
+  // Keep previews and newly persisted events available while viewer snapshots load.
   #replayFrames: string[] = [];
   #replayFrameChars = 0;
 
@@ -171,6 +169,7 @@ export class SessionViewerSocketHub {
       this.#replayFrameChars += frame.length;
     }
 
+    const frameCount = this.#replayFrames.length;
     while (this.#replayFrameChars > MAX_REPLAY_FRAME_CHARS) {
       const dropped = this.#replayFrames.shift();
 
@@ -180,6 +179,8 @@ export class SessionViewerSocketHub {
 
       this.#replayFrameChars -= dropped.length;
     }
+    // Invalidate snapshots that can no longer replay every frame received during their read.
+    if (this.#replayFrames.length !== frameCount) this.#replayFrames = this.#replayFrames.slice();
   }
 
   #hasOpenViewer(sessionId: string): boolean {

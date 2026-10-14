@@ -11,6 +11,7 @@ import type {
   SessionModelCallId,
   SessionRunId,
 } from "@mosoo/id";
+import { sql } from "drizzle-orm";
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 import { platformIdColumn } from "../id-column";
@@ -104,6 +105,11 @@ export const sessionEventsTable = sqliteTable(
       table.seq,
     ),
     index("session_event_run_event_type_idx").on(table.runId, table.eventType),
+    index("session_event_session_thought_idx").on(
+      table.sessionId,
+      sql`CASE WHEN ${table.eventType} LIKE 'thought.%'
+        THEN ${table.canonicalEventJson} ->> '$.payload.thoughtId' END`,
+    ),
     uniqueIndex("session_event_session_seq_idx").on(table.sessionId, table.seq),
     uniqueIndex("session_event_session_source_idx").on(table.sessionId, table.sourceEventId),
   ],

@@ -24,7 +24,7 @@ export interface SessionEventProcessRow extends StreamFoldableSessionEventRow {
 export function sessionEventThoughtColumns() {
   return {
     thought_id: sql<string | null>`CASE WHEN ${sessionEventsTable.eventType} LIKE 'thought.%'
-      THEN json_extract(${sessionEventsTable.canonicalEventJson}, '$.payload.thoughtId') END`,
+      THEN ${sessionEventsTable.canonicalEventJson} ->> '$.payload.thoughtId' END`,
     thought_offset: sql<number | null>`CASE WHEN ${sessionEventsTable.eventType} = 'thought.updated'
       THEN json_extract(${sessionEventsTable.canonicalEventJson}, '$.payload.offset') END`,
   };

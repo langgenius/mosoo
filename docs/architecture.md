@@ -119,6 +119,7 @@ flowchart LR
 - **D1 schema** lives in `pkgs/db/src/schema`. Migrations are append-only: follow [CONTRIBUTING](../CONTRIBUTING.md#database-and-migrations).
 - **Events:** every Session event is written to `session_event` with a per-Session `seq`, deduplicated by its source event ID, before any live delivery. Live delivery is best effort; history reads and SSE streams serve the persisted record.
   Viewer thinking recovery reads a bounded history window.
+  Snapshot delivery restarts its read if replay frames are discarded before it finishes.
   Driver ingestion validates thought offsets, completion and byte totals from persisted metadata and the last content chunk, keeping full thought bodies out of its live state.
 - **Background work:** an `api_command` row is written to D1 before delivery (for Run dispatch, in the same batch as the Run). Queues deliver it at least once, consumers claim it idempotently, and the one-minute cron redrives commands that were never delivered or whose consumer stopped, then starts maintenance.
 - **Usage:** each model call writes a `session_model_call` row and its `usage_event` in one batch. A daily rollup folds `usage_event` rows older than `DETAIL_RETENTION_DAYS` into `usage_daily_rollup`. Costs are estimates from a recorded price snapshot (`pricing_status` may be `unknown`); there is no billing or settlement.
