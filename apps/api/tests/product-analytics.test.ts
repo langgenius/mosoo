@@ -85,4 +85,14 @@ describe("server product analytics", () => {
       ),
     ).resolves.toHaveLength(1);
   });
+
+  it("never throws when PostHog rejects a capture", async () => {
+    await expect(
+      captureWithFetch(
+        { ...BINDINGS, POSTHOG_PROJECT_KEY: "phc_public" },
+        { distinctId: "acct_123", event: "api_request_completed" },
+        async () => new Response(null, { status: 503 }),
+      ),
+    ).resolves.toHaveLength(1);
+  });
 });
