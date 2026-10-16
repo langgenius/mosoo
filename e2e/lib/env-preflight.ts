@@ -1,4 +1,6 @@
-export type PreviewProviderId = "anthropic" | "openai";
+import { getDefaultModelIdForVendor } from "@mosoo/runtime-catalog";
+
+export type PreviewProviderId = "anthropic" | "gemini" | "openai";
 
 interface HarnessErrorInput {
   readonly fix: string;
@@ -8,6 +10,7 @@ interface HarnessErrorInput {
 
 interface PreviewRuntimeCredential {
   apiKey: string;
+  modelId: string | null;
   providerId: PreviewProviderId;
   runtimeButtonName: string;
 }
@@ -23,13 +26,13 @@ function readPreviewProviderId(): PreviewProviderId {
     return "openai";
   }
 
-  if (provider === "anthropic") {
-    return "anthropic";
+  if (provider === "anthropic" || provider === "gemini") {
+    return provider;
   }
 
   throw new Error(
     formatHarnessError({
-      fix: "Set `MOSOO_E2E_PROVIDER=openai` or `MOSOO_E2E_PROVIDER=anthropic`.",
+      fix: "Set `MOSOO_E2E_PROVIDER=openai`, `MOSOO_E2E_PROVIDER=anthropic`, or `MOSOO_E2E_PROVIDER=gemini`.",
       what: `Preview live runtime smoke cannot start because MOSOO_E2E_PROVIDER=${provider} is unsupported.`,
       why: "The live harness must select a concrete public runtime provider before creating an agent.",
     }),
@@ -41,7 +44,9 @@ function readProviderApiKey(providerId: PreviewProviderId): string {
     process.env["MOSOO_E2E_PROVIDER_API_KEY"]?.trim() ||
     (providerId === "anthropic"
       ? process.env["MOSOO_E2E_ANTHROPIC_API_KEY"]?.trim()
-      : process.env["MOSOO_E2E_OPENAI_API_KEY"]?.trim()) ||
+      : providerId === "gemini"
+        ? process.env["MOSOO_E2E_GEMINI_API_KEY"]?.trim()
+        : process.env["MOSOO_E2E_OPENAI_API_KEY"]?.trim()) ||
     ""
   );
 }
@@ -53,7 +58,7 @@ export function requirePreviewRuntimeCredential(): PreviewRuntimeCredential {
   if (providerKey.length === 0) {
     throw new Error(
       formatHarnessError({
-        fix: "Set `MOSOO_E2E_PROVIDER=anthropic MOSOO_E2E_PROVIDER_API_KEY=...`, or `MOSOO_E2E_PROVIDER=openai MOSOO_E2E_PROVIDER_API_KEY=...`.",
+        fix: "Set `MOSOO_E2E_PROVIDER` to the selected provider and supply `MOSOO_E2E_PROVIDER_API_KEY` or its provider-specific key.",
         what: "Preview live runtime smoke cannot start because the provider credential is missing.",
         why: "Live runtime smoke must run against the provider that owns the selected agent.",
       }),
@@ -62,8 +67,10 @@ export function requirePreviewRuntimeCredential(): PreviewRuntimeCredential {
 
   return {
     apiKey: providerKey,
+    modelId: providerId === "gemini" ? getDefaultModelIdForVendor(providerId) : null,
     providerId,
-    runtimeButtonName: providerId === "anthropic" ? "Claude" : "OpenAI",
+    runtimeButtonName:
+      providerId === "anthropic" ? "Claude" : providerId === "gemini" ? "OpenCode" : "OpenAI",
   };
 }
 

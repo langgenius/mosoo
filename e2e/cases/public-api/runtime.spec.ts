@@ -1,14 +1,19 @@
 import { PUBLIC_API_PREFIX } from "@mosoo/contracts/public-api";
-import { RUNTIME_CATALOG, listPresetModelsForVendor } from "@mosoo/runtime-catalog";
+import {
+  RUNTIME_CATALOG,
+  getDefaultModelIdForVendor,
+  listPresetModelsForVendor,
+} from "@mosoo/runtime-catalog";
 import { expect, test } from "@playwright/test";
 import type { APIRequestContext } from "@playwright/test";
 
 import { requirePiRuntimeSettings } from "../../lib/env-preflight";
 
-type ProviderId = "anthropic" | "deepseek" | "openai" | "opencode" | "pi";
+type ProviderId = "anthropic" | "deepseek" | "gemini" | "openai" | "opencode" | "pi";
 type RuntimeCredentialVendorId =
   | "anthropic"
   | "deepseek"
+  | "gemini"
   | "openai"
   | "opencode"
   | "openai-compatible";
@@ -40,7 +45,12 @@ function readProviderId(): ProviderId {
     return "anthropic";
   }
 
-  if (provider === "deepseek" || provider === "opencode" || provider === "pi") {
+  if (
+    provider === "deepseek" ||
+    provider === "gemini" ||
+    provider === "opencode" ||
+    provider === "pi"
+  ) {
     return provider;
   }
 
@@ -58,9 +68,11 @@ function requireProviderApiKey(providerId: ProviderId): string {
       ? process.env["MOSOO_E2E_ANTHROPIC_API_KEY"]?.trim()
       : providerId === "deepseek"
         ? process.env["MOSOO_E2E_DEEPSEEK_API_KEY"]?.trim()
-        : providerId === "opencode"
-          ? process.env["MOSOO_E2E_OPENCODE_API_KEY"]?.trim()
-          : process.env["MOSOO_E2E_OPENAI_API_KEY"]?.trim()) ||
+        : providerId === "gemini"
+          ? process.env["MOSOO_E2E_GEMINI_API_KEY"]?.trim()
+          : providerId === "opencode"
+            ? process.env["MOSOO_E2E_OPENCODE_API_KEY"]?.trim()
+            : process.env["MOSOO_E2E_OPENAI_API_KEY"]?.trim()) ||
     "";
 
   if (apiKey.length === 0) {
@@ -124,7 +136,9 @@ function selectPresetRuntime(providerId: "anthropic" | "openai"): RuntimeSelecti
   };
 }
 
-function selectAcpFallbackRuntime(providerId: "deepseek" | "opencode"): RuntimeSelection {
+function selectAcpFallbackRuntime(
+  providerId: "deepseek" | "gemini" | "opencode",
+): RuntimeSelection {
   const runtimeId = readRuntimeIdOverride() ?? "acp-fallback";
   const runtime = findPublicRuntime(runtimeId);
 
@@ -139,10 +153,12 @@ function selectAcpFallbackRuntime(providerId: "deepseek" | "opencode"): RuntimeS
   const model =
     providerId === "deepseek"
       ? process.env["MOSOO_E2E_DEEPSEEK_MODEL"]?.trim() || DEFAULT_DEEPSEEK_MODEL
-      : process.env["MOSOO_E2E_OPENCODE_MODEL"]?.trim() ||
-        listPresetModelsForVendor("opencode").find((entry) =>
-          runtime.supportedModelIds.includes(entry.modelId),
-        )?.modelId;
+      : providerId === "gemini"
+        ? (getDefaultModelIdForVendor(providerId) ?? undefined)
+        : process.env["MOSOO_E2E_OPENCODE_MODEL"]?.trim() ||
+          listPresetModelsForVendor("opencode").find((entry) =>
+            runtime.supportedModelIds.includes(entry.modelId),
+          )?.modelId;
 
   if (model === undefined) {
     throw new Error(
@@ -187,7 +203,7 @@ function getRuntimeSelection(providerId: ProviderId): RuntimeSelection {
     };
   }
 
-  if (providerId === "deepseek" || providerId === "opencode") {
+  if (providerId === "deepseek" || providerId === "gemini" || providerId === "opencode") {
     return selectAcpFallbackRuntime(providerId);
   }
 

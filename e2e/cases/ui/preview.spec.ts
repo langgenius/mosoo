@@ -5,6 +5,7 @@ import { loginWithMosooAiBackdoor } from "../../lib/dev-auth";
 import { requirePreviewRuntimeCredential } from "../../lib/env-preflight";
 import {
   configureProviderCompanyKey,
+  configurePreviewRuntimeModel,
   createPreviewRuntimeAgent,
   createPreviewRunId,
   getPreviewSmokeEmail,
@@ -79,6 +80,12 @@ test("Preview E2E smoke covers mosoo.ai login, blockers, stream, tool, pill, and
     providerId: runtimeCredential.providerId,
     runId,
   });
+  if (runtimeCredential.modelId !== null) {
+    await configurePreviewRuntimeModel(page, agentId, {
+      modelId: runtimeCredential.modelId,
+      providerId: runtimeCredential.providerId,
+    });
+  }
   await sendPreviewMessageAndVerifyRealStream(page, agentId);
   await verifyDiagnostics(page, agentId);
 });
