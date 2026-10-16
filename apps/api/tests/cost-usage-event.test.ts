@@ -261,19 +261,19 @@ describe("cost usage event", () => {
       output_tokens: 200,
       pricing_status: "priced",
       provider: "openai",
-      total_cost_usd_micros: 5_300,
+      total_cost_usd_micros: 5_275,
     });
     const priceSnapshot = JSON.parse(row?.price_snapshot_json ?? "{}") as Record<string, unknown>;
     expect(priceSnapshot).toMatchObject({
       billableInputTokens: 860,
       cacheReadUsdPerMillion: 0.25,
-      cacheWriteUsdPerMillion: 3.125,
+      cacheWriteUsdPerMillion: 2.5,
       inputUsdPerMillion: 2.5,
       longContextApplied: false,
       model: "gpt-5.4",
       outputUsdPerMillion: 15,
       provider: "openai",
-      source: "mosoo_seed_2026_07_10",
+      source: "https://models.dev/api.json",
     });
   });
 
@@ -334,7 +334,7 @@ describe("cost usage event", () => {
       pricing_status: "priced",
       provider: "kimi",
       runtime_id: "opencode",
-      total_cost_usd_micros: 1_633,
+      total_cost_usd_micros: 1_671,
     });
     const priceSnapshot = JSON.parse(row?.price_snapshot_json ?? "{}") as Record<string, unknown>;
     expect(priceSnapshot).toMatchObject({
@@ -344,6 +344,39 @@ describe("cost usage event", () => {
       model: "kimi-k2.6",
       outputUsdPerMillion: 4,
       provider: "kimi",
+    });
+  });
+
+  test("preserves recorded costs and snapshots while pricing new calls from the current catalog", async () => {
+    const database = createUsageEventDatabase();
+    const input = {
+      callKey: "recorded-call",
+      driverInstanceId: DRIVER_INSTANCE_ID,
+      nativeCallId: null,
+      run: { ...RUN_CONTEXT, model: "gpt-5.4", provider: "openai" },
+      usage: {
+        inputTokens: 1_000_000,
+        outputTokens: 0,
+        usageContract: "openai_total_with_cached_breakdown",
+      },
+    } satisfies RecordRuntimeUsageEventInput;
+    await recordRuntimeUsageEvent(database, input);
+    const recordedSnapshot = '{"inputUsdPerMillion":99,"source":"previous_catalog"}';
+    await database
+      .prepare("UPDATE usage_event SET total_cost_usd_micros = 99000000, price_snapshot_json = ?")
+      .bind(recordedSnapshot)
+      .run();
+    await recordRuntimeUsageEvent(database, { ...input, callKey: "new-call" });
+    const { results } = await database
+      .prepare(
+        "SELECT total_cost_usd_micros, price_snapshot_json FROM usage_event ORDER BY total_cost_usd_micros",
+      )
+      .all();
+    expect(results).toHaveLength(2);
+    expect(results[0]).toMatchObject({ total_cost_usd_micros: 5_000_000 });
+    expect(results[1]).toEqual({
+      total_cost_usd_micros: 99_000_000,
+      price_snapshot_json: recordedSnapshot,
     });
   });
 

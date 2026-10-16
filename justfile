@@ -39,6 +39,10 @@ fmt-check:
 docs-check:
     bun run docs:check
 
+# Refresh reference prices from models.dev; review the resulting git diff.
+models-refresh:
+    bun apps/api/bin/refresh-models-dev.ts
+
 # Check formatting for one file or directory.
 fmt-check-path path:
     ./node_modules/.bin/vp fmt --check --ignore-path .gitignore "{{ path }}"
