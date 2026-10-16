@@ -61,6 +61,8 @@ const webConfig = {
     },
   },
   server: {
+    // Local Sandbox callbacks reach the dev proxy through Docker's host alias.
+    allowedHosts: ["host.docker.internal"],
     host: "0.0.0.0",
     port: webDevPort,
     proxy: {
