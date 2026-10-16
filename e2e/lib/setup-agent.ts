@@ -68,11 +68,26 @@ export async function configureProviderCompanyKey(
     .filter({ has: page.getByRole("button", { name: "Add Key" }) })
     .first();
   await providerCard.getByRole("button", { name: "Add Key" }).click();
-  await providerCard.getByPlaceholder("e.g. Production").fill(`Preview smoke ${input.runId}`);
-  await providerCard.getByPlaceholder("sk-...").fill(input.apiKey);
-  await providerCard.getByLabel("Use as default credential for this provider").check();
-  await providerCard.getByRole("button", { name: "Save" }).click();
-  await expect(providerCard.getByText("Default")).toBeVisible({
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await dialog
+    .getByRole("textbox", { name: "Name", exact: true })
+    .fill(`Preview smoke ${input.runId}`);
+  await dialog.getByLabel("API key", { exact: true }).fill(input.apiKey);
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  const savedCredential = providerCard.locator('[data-slot="connection-row"]').filter({
+    has: page.getByText(`Preview smoke ${input.runId}`, { exact: true }),
+  });
+  await expect(savedCredential).toBeVisible();
+  const setDefaultButton = savedCredential.getByRole("button", {
+    name: "Set default",
+    exact: true,
+  });
+  if (await setDefaultButton.isVisible()) {
+    await setDefaultButton.click();
+  }
+  await expect(savedCredential.getByText("Default", { exact: true })).toBeVisible({
     timeout: 30_000,
   });
 }
