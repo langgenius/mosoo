@@ -59,8 +59,28 @@ jobs:
           report_file="$RUNNER_TEMP/container-runtime-report.md"
 
           # Resolves every image application wrangler deploys for this
-          # environment and pages through all of their instances.
-          bun scripts/collect-container-instances.ts apps/api/wrangler.toml "$WRANGLER_ENV" "$instances_file"
+          # environment and pages through all of their instances. Exit 3 means
+          # the container-monitor credentials are missing or refused, and the
+          # script printed how to fix them instead.
+          set +e
+          bun scripts/collect-container-instances.ts apps/api/wrangler.toml "$WRANGLER_ENV" "$instances_file" > "$report_file"
+          status=$?
+          set -e
+
+          if [[ "$status" -eq 3 ]]; then
+            echo "::error title=Container monitor credentials::$(cat "$report_file")"
+            cat "$report_file" >> "$GITHUB_STEP_SUMMARY"
+            # Only a manual run fails; a scheduled one would otherwise fail, and
+            # email, every 15 minutes until someone fixes the secrets.
+            if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+              exit 1
+            fi
+            exit 0
+          fi
+
+          if [[ "$status" -ne 0 ]]; then
+            exit "$status"
+          fi
 
           set +e
           bun scripts/check-container-runtime.ts "$instances_file" > "$report_file"
@@ -76,6 +96,9 @@ jobs:
           cat "$report_file" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Open or resolve incident issue
+        # Acts only on a verdict from Cloudflare data, so a credentials failure
+        # never opens, closes or updates an [Ops] issue.
+        if: steps.inspect.outputs.anomaly != ''
         env:
           GH_TOKEN: ${{ github.token }}
           ANOMALY: ${{ steps.inspect.outputs.anomaly }}

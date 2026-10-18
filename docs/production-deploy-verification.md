@@ -147,8 +147,10 @@ GitHub environments:
   `CLOUDFLARE_ACCOUNT_ID` and a `CLOUDFLARE_API_TOKEN` limited to Containers
   Read, never the deploy token. With it, the `Container runtime alert` workflow
   opens `[Ops]` issues for container count or age anomalies in prod and stage;
-  it never stops a container. A job fails when the token is missing or cannot
-  read containers, when the account cannot be resolved, or when a container
+  it never stops a container. While either secret is missing or Cloudflare
+  refuses the token, each job says so in its summary, touches no issue, and
+  fails only a `workflow_dispatch` run instead of every scheduled one. A job
+  fails when Cloudflare cannot be read for another reason or when a container
   application derived from `apps/api/wrangler.toml` is missing from Cloudflare,
   for example a class merged to `main` but not yet released. After setting or
   rotating the secrets, run it with `workflow_dispatch` and confirm both jobs
