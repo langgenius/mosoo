@@ -8,7 +8,10 @@ import type { DriverModelConnection } from "@mosoo/agent-driver/boot";
 import type { PresetModelProtocol } from "@mosoo/contracts/models";
 
 import { buildOpenCodeModelConfig } from "../../../driver/src/runtimes/acp/acp-configuration";
-import { readPiModelConfiguration } from "../../../driver/src/runtimes/pi/pi-configuration";
+import {
+  PI_SETTINGS,
+  readPiModelConfiguration,
+} from "../../../driver/src/runtimes/pi/pi-configuration";
 import { PI_MODEL_CONFIGURATION_SOURCE } from "../../../driver/src/runtimes/pi/pi-model-configuration";
 
 const piCli = fileURLToPath(
@@ -221,16 +224,8 @@ export async function runPiProxyTurn(
   const agentDir = join(home, "pi");
   await mkdir(agentDir);
   await writeFile(join(agentDir, "models.json"), "{}", { mode: 0o600 });
-  await writeFile(
-    join(agentDir, "settings.json"),
-    JSON.stringify({
-      retry: { enabled: false },
-      packages: [],
-      extensions: [],
-      skills: [],
-      promptTemplates: [],
-    }),
-  );
+  // The Driver's launch settings, so the fixture shares its retry policy.
+  await writeFile(join(agentDir, "settings.json"), JSON.stringify(PI_SETTINGS));
   const extension = join(agentDir, "mosoo-model.mjs");
   await writeFile(
     extension,
@@ -280,7 +275,7 @@ export async function runPiProxyTurn(
   child.on("error", (error) => finished.reject(error));
   child.on("close", (code) => {
     exited.resolve();
-    finished.reject(new Error(`Pi exited before agent_end (${code}): ${stderr}`));
+    finished.reject(new Error(`Pi exited before agent_settled (${code}): ${stderr}`));
   });
   child.stdout.on("data", (chunk: string) => {
     pending += chunk;
@@ -297,7 +292,9 @@ export async function runPiProxyTurn(
         events.push(event);
         if (event["type"] === "response" && event["success"] === false)
           finished.reject(new Error(JSON.stringify(event)));
-        if (event["type"] === "agent_end") finished.resolve(events);
+        // Like the Driver, wait for settlement: Pi ends a failed attempt with
+        // agent_end before it retries.
+        if (event["type"] === "agent_settled") finished.resolve(events);
       } catch (error) {
         finished.reject(error);
       }
