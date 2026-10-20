@@ -126,7 +126,7 @@ function apiKeyPlaceholder(
   t: ReturnType<typeof useTranslation>["t"],
 ): string {
   if (form.id === null) {
-    return "sk-...";
+    return form.vendorId === "opencode-go" ? "oc_sk_..." : "sk-...";
   }
 
   return form.maskedApiKey

@@ -4,7 +4,12 @@ import type {
   TestVendorCredentialResult,
 } from "@mosoo/contracts/vendor-credential";
 import type { RuntimeCatalogVendor } from "@mosoo/runtime-catalog";
-import { VENDOR_OPENAI_COMPATIBLE, getPresetModel, getVendor } from "@mosoo/runtime-catalog";
+import {
+  VENDOR_OPENAI_COMPATIBLE,
+  getDefaultModelIdForVendor,
+  getPresetModel,
+  getVendor,
+} from "@mosoo/runtime-catalog";
 
 import {
   captureServerProductEvent,
@@ -37,6 +42,7 @@ export interface VendorCredentialProbeInput {
   timeoutMs?: number;
   vendorId: string;
   verifyModelProtocol?: boolean;
+  versionMetadata?: Pick<WorkerVersionMetadata, "id">;
 }
 
 function modelProbeRequest(
@@ -118,6 +124,7 @@ async function probeModelProtocol(input: {
   timeoutMs: number;
   vendor: RuntimeCatalogVendor;
   verifyResponse: boolean;
+  versionMetadata: Pick<WorkerVersionMetadata, "id"> | undefined;
 }): Promise<{ errorCode?: string; ok: boolean }> {
   const request = modelProbeRequest(input.modelId, input.modelProtocol);
   const url = new URL(input.baseUrl);
@@ -136,7 +143,12 @@ async function probeModelProtocol(input: {
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",
-        ...toVendorProbeAuthHeaders(input.vendor, input.apiKey, input.modelProtocol),
+        ...toVendorProbeAuthHeaders(
+          input.vendor,
+          input.apiKey,
+          input.modelProtocol,
+          input.versionMetadata,
+        ),
       },
       method: "POST",
     },
@@ -208,6 +220,7 @@ export async function testVendorCredential(
 
   const result = await probeVendorCredential({
     ...input,
+    versionMetadata: bindings.CF_VERSION_METADATA,
     fetchProxy: resolveProviderFetchProxy(bindings),
     modelProtocol: normalizeCredentialModelProtocol(input.vendorId, input.modelProtocol),
     verifyModelProtocol: Boolean(input.modelId?.trim()),
@@ -233,13 +246,17 @@ export async function probeVendorCredential(
   const apiKey = input.apiKey.trim();
   const apiBase = normalizeApiBase(input.apiBase);
   const fetchProxy = input.fetchProxy ?? null;
-  const modelId = input.modelId?.trim() || null;
   const timeoutMs = input.timeoutMs ?? 10_000;
   const vendor = getVendor(input.vendorId);
 
   if (vendor === null) {
     throw new Error(`Unknown vendor: ${input.vendorId}.`);
   }
+  // Go's public model list does not authenticate a subscription key.
+  const requiresInferenceProbe = vendor.vendorId === "opencode-go";
+  const modelId =
+    input.modelId?.trim() ||
+    (requiresInferenceProbe ? getDefaultModelIdForVendor(vendor.vendorId) : null);
   const modelIdRequired = vendor.vendorId === VENDOR_OPENAI_COMPATIBLE.vendorId;
   const modelProtocol =
     input.modelProtocol ??
@@ -298,11 +315,12 @@ export async function probeVendorCredential(
   let errorCode: string | undefined;
 
   try {
-    if (input.verifyModelProtocol && modelId !== null) {
+    if ((input.verifyModelProtocol || requiresInferenceProbe) && modelId !== null) {
       const result =
         modelProtocol === null
           ? { errorCode: "unknown_model_protocol", ok: false }
           : await probeModelProtocol({
+              versionMetadata: input.versionMetadata,
               apiKey,
               baseUrl,
               fetchProxy,
@@ -325,7 +343,7 @@ export async function probeVendorCredential(
       {
         headers: {
           Accept: "application/json",
-          ...toVendorProbeAuthHeaders(vendor, apiKey, modelProtocol),
+          ...toVendorProbeAuthHeaders(vendor, apiKey, modelProtocol, input.versionMetadata),
         },
         method: "GET",
       },
@@ -343,6 +361,7 @@ export async function probeVendorCredential(
         if (!ok) {
           if (modelProtocol !== null) {
             const modelProbe = await probeModelProtocol({
+              versionMetadata: input.versionMetadata,
               apiKey,
               baseUrl,
               fetchProxy,
@@ -365,6 +384,7 @@ export async function probeVendorCredential(
       errorCode = "missing_model_id";
     } else if (modelProtocol !== null) {
       const modelProbe = await probeModelProtocol({
+        versionMetadata: input.versionMetadata,
         apiKey,
         baseUrl,
         fetchProxy,

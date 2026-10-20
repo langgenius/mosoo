@@ -202,7 +202,10 @@ export async function buildExecutionSpec(
     provider: input.profile.provider,
     providerOptions: input.profile.providerOptions,
     session: {
-      additionalDirectories: listAdditionalDirectories(input.profile),
+      additionalDirectories:
+        input.profile.runtimeId === "acp-fallback" || input.profile.runtimeId === "pi"
+          ? []
+          : listAdditionalDirectories(input.profile),
       context: {
         sandboxSessionId: input.profile.session.sandboxSessionId,
         homePath: input.profile.session.homePath,

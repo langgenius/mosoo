@@ -1,6 +1,7 @@
 import type { PresetModelProtocol } from "@mosoo/contracts/models";
 import type { RuntimeCatalogVendor } from "@mosoo/runtime-catalog";
 
+import { getWorkerUserAgent } from "../../../platform/cloudflare/worker-user-agent";
 import type { ProviderFetchProxyConfig } from "./provider-fetch-proxy";
 import { fetchViaProviderProxy } from "./provider-fetch-proxy";
 
@@ -24,7 +25,17 @@ export function toVendorProbeAuthHeaders(
   vendor: RuntimeCatalogVendor,
   apiKey: string,
   modelProtocol?: PresetModelProtocol | null,
+  versionMetadata?: Pick<WorkerVersionMetadata, "id">,
 ): Record<string, string> {
+  if (vendor.vendorId === "opencode-go") {
+    return {
+      Authorization: `Bearer ${apiKey}`,
+      "User-Agent": getWorkerUserAgent(versionMetadata),
+      // A manual credential probe is its own short-lived conversation.
+      "x-opencode-session": crypto.randomUUID(),
+      ...(modelProtocol === "anthropic-messages" ? { "anthropic-version": "2023-06-01" } : {}),
+    };
+  }
   if (vendor.vendorId === "openai-compatible") {
     if (modelProtocol === "anthropic-messages") {
       return { "anthropic-version": "2023-06-01", "x-api-key": apiKey };
@@ -81,7 +92,7 @@ function sanitizeProviderErrorDetail(detail: string | null | undefined): string 
     ?.trim()
     .replaceAll(/\s+/gu, " ")
     .replaceAll(/\bBearer\s+[A-Za-z0-9._~+/=-]+/giu, "Bearer ***")
-    .replaceAll(/\b(sk|rk|pk)-[A-Za-z0-9_*.-]+/gu, "$1-***");
+    .replaceAll(/\b((?:sk|rk|pk)-|oc_sk_)[A-Za-z0-9_*.-]+/gu, "$1***");
 
   return normalized === undefined ? undefined : normalized.slice(0, 180);
 }
