@@ -6,7 +6,7 @@ import type { DriverProfileConfig } from "../../domain/driver-snapshot";
 import type { ExecutionSessionHandle } from "../sandbox-handles";
 import {
   getParentDirectory,
-  listAdditionalDirectories,
+  listProvisioningDirectories,
 } from "./runtime-sandbox-provisioning.paths";
 
 async function sha256(value: string): Promise<string> {
@@ -18,7 +18,7 @@ export async function ensureProvisioningDirectories(
   session: ExecutionSessionHandle,
   profile: DriverProfileConfig,
 ): Promise<void> {
-  const directories = listAdditionalDirectories(profile);
+  const directories = listProvisioningDirectories(profile);
   const result = await session.exec(
     `mkdir -p ${directories.map((directory) => quoteShellArg(directory)).join(" ")}`,
   );

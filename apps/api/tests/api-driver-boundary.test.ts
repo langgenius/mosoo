@@ -55,6 +55,22 @@ const artifactPaths = {
 };
 
 describe("API to driver boundary", () => {
+  test("OpenCode provisioning does not request unsupported ACP additional directories", async () => {
+    const profile = createDriverProfile();
+    const execution = await buildExecutionSpec(bindings, {
+      builtInTools: [],
+      driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
+      profile: { ...profile, runtimeId: "acp-fallback" },
+      requestUrl: "https://api.example.com/",
+      resolvedMcpServers: [],
+      resolvedSkills: [],
+      resolvedSkillCatalog: [],
+    });
+    expect(execution.session.additionalDirectories).toEqual([]);
+    expect(execution.session.cwd).toBe(profile.session.sessionOrganizationPath);
+    expect(execution.session.context.homePath).toBe(profile.session.homePath);
+  });
+
   test.each(["cattle", "pet"] as const)(
     "requires a committed native checkpoint even when the boot input retains a historical %s label",
     async (kind) => {

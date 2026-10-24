@@ -37,7 +37,7 @@ export function getParentDirectory(path: string): string {
   return `/${parts.slice(0, -1).join("/")}`;
 }
 
-export function listAdditionalDirectories(profile: DriverProfileConfig): string[] {
+export function listProvisioningDirectories(profile: DriverProfileConfig): string[] {
   return [
     ...new Set([
       SANDBOX_CACHE_PATH,
