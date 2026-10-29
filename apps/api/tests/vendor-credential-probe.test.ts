@@ -4,6 +4,7 @@ import type { PresetModelProtocol } from "@mosoo/contracts/models";
 
 import {
   readVendorProbeBaseHost,
+  readVendorProbeErrorCode,
   toVendorProbeEndpointUrl,
   validateVendorProbeBaseUrl,
   vendorProbeModelListIncludes,
@@ -11,6 +12,21 @@ import {
 import { probeVendorCredential } from "../src/modules/vendor-credentials/application/vendor-credential-test";
 
 describe("vendor credential probe", () => {
+  test.each(["json", "text"] as const)(
+    "Given an echoed Go key, When reading a %s probe error, Then the key is redacted",
+    async (format) => {
+      const message = "Invalid API key oc_sk_test-secret_123; replace sk-legacy-secret";
+      const response =
+        format === "json"
+          ? Response.json({ error: { message } }, { status: 401 })
+          : new Response(message, { status: 401 });
+
+      expect(await readVendorProbeErrorCode(response)).toBe(
+        "http_401: Invalid API key oc_sk_***; replace sk-***",
+      );
+    },
+  );
+
   test("builds v1 endpoint URLs from vendor API bases", () => {
     expect(toVendorProbeEndpointUrl("https://api.example.com", "models")).toBe(
       "https://api.example.com/v1/models",
@@ -317,3 +333,78 @@ describe("vendor credential probe", () => {
     });
   }
 });
+
+test("Given a Go key, When testing a model, Then the probe identifies Mosoo and uses Go auth", async () => {
+  const originalFetch = globalThis.fetch;
+  const requests: Request[] = [];
+  globalThis.fetch = async (url, init) => {
+    requests.push(new Request(url, init));
+    return Response.json({ type: "message", content: [{ type: "text", text: "pong" }] });
+  };
+  try {
+    const result = await probeVendorCredential({
+      apiKey: "probe-key",
+      modelId: "minimax-m2.7",
+      modelProtocol: "anthropic-messages",
+      vendorId: "opencode-go",
+      versionMetadata: { id: "go-probe-release" },
+      verifyModelProtocol: true,
+    });
+    expect(result.ok).toBe(true);
+    expect(requests).toHaveLength(1);
+    expect(requests[0].url).toBe("https://opencode.ai/zen/go/v1/messages");
+    expect(requests[0].headers.get("authorization")).toBe("Bearer probe-key");
+    expect(requests[0].headers.get("user-agent")).toBe("mosoo/go-probe-release");
+    expect(requests[0].headers.get("x-opencode-session")).toMatch(/^[a-f0-9-]{36}$/);
+    expect(requests[0].headers.get("anthropic-version")).toBe("2023-06-01");
+    expect(requests[0].headers.has("x-api-key")).toBe(false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test.each([true, false])(
+  "Go credential tests verify inference authentication when the public model list is accessible (valid=%s)",
+  async (validKey) => {
+    const originalFetch = globalThis.fetch;
+    const requests: Request[] = [];
+    globalThis.fetch = async (url, init) => {
+      const request = new Request(url, init);
+      requests.push(request);
+      if (request.method === "GET") {
+        return Response.json({ data: [{ id: "deepseek-v4.1-flash" }] });
+      }
+      return validKey
+        ? Response.json({ choices: [{ message: { content: "pong" } }] })
+        : Response.json({ error: { message: "Invalid API key" } }, { status: 401 });
+    };
+    try {
+      const result = await probeVendorCredential({ apiKey: "probe-key", vendorId: "opencode-go" });
+      expect(result.ok).toBe(validKey);
+      expect(requests).toHaveLength(1);
+      expect(requests[0]?.method).toBe("POST");
+      expect(await requests[0]?.json()).toMatchObject({
+        model: "deepseek-v4.1-flash",
+        max_tokens: 1,
+      });
+      if (!validKey) expect(result.errorCode).toStartWith("http_401");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  },
+);
+
+test.each([402, 429, 404])(
+  "Go probe preserves upstream HTTP %s instead of labeling it as a bad key",
+  async (status) => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => Response.json({ error: { message: "Unavailable" } }, { status });
+    try {
+      const result = await probeVendorCredential({ apiKey: "probe-key", vendorId: "opencode-go" });
+      expect(result.ok).toBe(false);
+      expect(result.errorCode).toStartWith(`http_${status}`);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  },
+);

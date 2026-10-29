@@ -250,6 +250,37 @@ async function insertSessionProcessEvent(
 }
 
 describe("session process event projection", () => {
+  test("counts the latest usage snapshot per Run and model call", async () => {
+    const database = createProcessEventQueryDatabase();
+    const snapshots = [
+      { runId: "run-1", callId: null, tokens: 1916 },
+      { runId: "run-1", callId: "\t\n", tokens: 2000 },
+      { runId: "run-1", callId: null, tokens: 3865 },
+      { runId: "run-1", callId: "\t second-call \u00a0", tokens: 5 },
+      { runId: "run-1", callId: "second-call", tokens: 10 },
+      { runId: "run-2", callId: null, tokens: 8 },
+    ];
+    for (const [index, snapshot] of snapshots.entries()) {
+      await insertSessionProcessEvent(database, {
+        canonicalEventJson: JSON.stringify({
+          kind: "usage.updated",
+          payload: { callId: snapshot.callId, source: "session_update" },
+        }),
+        id: `usage-${index}`,
+        processType: "usage.updated",
+        runId: snapshot.runId,
+        seq: index + 1,
+        tokens: snapshot.tokens,
+      });
+    }
+    const events = await getThreadSessionProcessEvents(database, VIEWER, {
+      projectId: PROJECT_ID,
+      sessionId: SESSION_ID,
+    });
+    expect(events.map((event) => event.tokens)).toEqual([null, null, 3865, null, 10, 8]);
+    expect(events.reduce((total, event) => total + (event.tokens ?? 0), 0)).toBe(3883);
+  });
+
   test("reads canonical thought chunks and marks a window missing the first chunk as truncated", async () => {
     const database = createProcessEventQueryDatabase();
     for (const [index, content] of ["Saved", " thought"].entries()) {

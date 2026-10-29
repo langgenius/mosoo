@@ -15,7 +15,7 @@ async function sha256(value: string): Promise<string> {
 }
 
 export async function ensureProvisioningDirectories(
-  session: ExecutionSessionHandle,
+  session: Pick<ExecutionSessionHandle, "exec">,
   profile: DriverProfileConfig,
 ): Promise<void> {
   const directories = listProvisioningDirectories(profile);

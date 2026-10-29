@@ -236,6 +236,34 @@ describe("Driver protocol projection bridge", () => {
     ).toThrow();
   });
 
+  test("preserves OpenCode native step usage through Host validation and live projection", () => {
+    const usage = {
+      cachedReadTokens: 2_000,
+      costAmount: 0.001234,
+      costCurrency: "USD",
+      inputTokens: 8_000,
+      outputTokens: 42,
+      source: "native_step_totals",
+      totalTokens: 10_042,
+      usageContract: "anthropic_bucketed",
+    };
+    const event = parseRuntimeEventEnvelope(
+      envelope("usage.updated", usage, { runtimeId: "acp-fallback" }),
+    );
+    expect(event.payload).toEqual(usage);
+    const initial = createInitialSessionLiveState({
+      sessionId: PLATFORM_ID_FIXTURES.session,
+      title: null,
+      viewerId: "viewer",
+    });
+    const state = applyAgUiEventsToSessionLiveState(
+      initial,
+      projectRuntimeEventToAgUiSessionEvents(event),
+    );
+    expect(state.usage).toEqual(usage);
+    expect(createProcessDraftFromRuntimeEvent(event).tokens).toBe(usage.totalTokens);
+  });
+
   test("does not expose internal driver events to participants", () => {
     const event = parseRuntimeEventEnvelope(
       envelope(
