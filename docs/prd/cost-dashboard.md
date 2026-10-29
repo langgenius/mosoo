@@ -6,7 +6,8 @@ What the Project Usage view and an Agent's **Cost** tab show, and how far their 
 
 - Usage is built from the model calls mosoo records. Dollar amounts are estimates from observed tokens and mosoo's reference prices, or the USD amount a runtime reported.
 - **Overview**, **By Agent** and **By Model** break usage down by run type and time range, and each tab exports to CSV. Usage without an Agent appears as **Direct sessions**.
-- A later, more complete report for the same model call replaces that call's estimate. A price change does not recompute history.
+- Reference prices come from a checked-in, prices-only models.dev subset in the API. Run `just models-refresh` and review the git diff to update it; reviewed overrides cover missing presets. Cache rates default to input rates when absent; explicit zero rates remain free. Reasoning uses the output rate, and audio rates are ignored because audio is not metered separately. Structured context tiers apply strictly above their threshold to identified model-call reports. Unidentified reports may aggregate a turn, so they use base rates.
+- A later, more complete report for the same model call replaces its counters and recalculates its estimate using its recorded rates and context tiers. Older snapshots without tier details retain their recorded selected rates. Runtime-reported USD amounts can still be corrected. A catalog refresh does not reprice recorded calls.
 
 ## Limits
 

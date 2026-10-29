@@ -261,19 +261,19 @@ describe("cost usage event", () => {
       output_tokens: 200,
       pricing_status: "priced",
       provider: "openai",
-      total_cost_usd_micros: 5_300,
+      total_cost_usd_micros: 5_275,
     });
     const priceSnapshot = JSON.parse(row?.price_snapshot_json ?? "{}") as Record<string, unknown>;
     expect(priceSnapshot).toMatchObject({
       billableInputTokens: 860,
       cacheReadUsdPerMillion: 0.25,
-      cacheWriteUsdPerMillion: 3.125,
+      cacheWriteUsdPerMillion: 2.5,
       inputUsdPerMillion: 2.5,
       longContextApplied: false,
       model: "gpt-5.4",
       outputUsdPerMillion: 15,
       provider: "openai",
-      source: "mosoo_seed_2026_07_10",
+      source: "https://models.dev/api.json",
     });
   });
 
@@ -334,7 +334,7 @@ describe("cost usage event", () => {
       pricing_status: "priced",
       provider: "kimi",
       runtime_id: "opencode",
-      total_cost_usd_micros: 1_633,
+      total_cost_usd_micros: 1_671,
     });
     const priceSnapshot = JSON.parse(row?.price_snapshot_json ?? "{}") as Record<string, unknown>;
     expect(priceSnapshot).toMatchObject({
@@ -346,6 +346,122 @@ describe("cost usage event", () => {
       provider: "kimi",
     });
   });
+
+  test("preserves recorded costs and snapshots while pricing new calls from the current catalog", async () => {
+    const database = createUsageEventDatabase();
+    const input = {
+      callKey: "recorded-call",
+      driverInstanceId: DRIVER_INSTANCE_ID,
+      nativeCallId: null,
+      run: { ...RUN_CONTEXT, model: "gpt-5.4", provider: "openai" },
+      usage: {
+        inputTokens: 1_000_000,
+        outputTokens: 0,
+        usageContract: "openai_total_with_cached_breakdown",
+      },
+    } satisfies RecordRuntimeUsageEventInput;
+    await recordRuntimeUsageEvent(database, input);
+    const recordedSnapshot = JSON.stringify({
+      billableInputTokens: 1_000_000,
+      cacheReadUsdPerMillion: 2,
+      cacheWriteUsdPerMillion: 3,
+      inputUsdPerMillion: 99,
+      longContextApplied: false,
+      outputUsdPerMillion: 7,
+      source: "previous_catalog",
+    });
+    await database
+      .prepare("UPDATE usage_event SET total_cost_usd_micros = 99000000, price_snapshot_json = ?")
+      .bind(recordedSnapshot)
+      .run();
+    // Replaying the same call after a catalog deployment must not reprice it.
+    await recordRuntimeUsageEvent(database, input);
+    await recordRuntimeUsageEvent(database, { ...input, callKey: "new-call" });
+    const { results } = await database
+      .prepare(
+        "SELECT total_cost_usd_micros, price_snapshot_json FROM usage_event ORDER BY total_cost_usd_micros",
+      )
+      .all();
+    expect(results).toHaveLength(2);
+    expect(results[1]).toEqual({
+      total_cost_usd_micros: 99_000_000,
+      price_snapshot_json: recordedSnapshot,
+    });
+    expect(results[0]).toMatchObject({ total_cost_usd_micros: 2_500_000 });
+    await recordRuntimeUsageEvent(database, {
+      ...input,
+      usage: { ...input.usage, inputTokens: 500_000, outputTokens: 1_000 },
+    });
+    expect(
+      await database
+        .prepare(
+          "SELECT total_cost_usd_micros FROM usage_event WHERE source_event_id LIKE '%recorded-call'",
+        )
+        .first(),
+    ).toEqual({ total_cost_usd_micros: 49_507_000 });
+  });
+
+  test("uses recorded context tiers for corrected per-request counters", async () => {
+    const database = createUsageEventDatabase();
+    const input = {
+      callKey: "tiered-call",
+      driverInstanceId: DRIVER_INSTANCE_ID,
+      nativeCallId: "request-1",
+      run: { ...RUN_CONTEXT, model: "gpt-5.4", provider: "openai" },
+      usage: {
+        inputTokens: 100_000,
+        outputTokens: 0,
+        usageContract: "openai_total_with_cached_breakdown",
+      },
+    } satisfies RecordRuntimeUsageEventInput;
+    await recordRuntimeUsageEvent(database, input);
+    // Simulate a recorded catalog different from today's rates.
+    database.execute(`UPDATE usage_event SET price_snapshot_json = json_set(price_snapshot_json,
+      '$.baseRates.inputUsdPerMillion', 3, '$.inputUsdPerMillion', 3,
+      '$.contextTiers[0].inputUsdPerMillion', 9), total_cost_usd_micros = 300000`);
+    for (const [tokens, expected, tiered] of [
+      [300_000, 2_700_000, true],
+      [272_000, 816_000, false],
+      [100_000, 300_000, false],
+    ] as const) {
+      await recordRuntimeUsageEvent(database, {
+        ...input,
+        usage: { ...input.usage, inputTokens: tokens },
+      });
+      const row = await database
+        .prepare("SELECT total_cost_usd_micros, price_snapshot_json FROM usage_event")
+        .first<{ total_cost_usd_micros: number; price_snapshot_json: string }>();
+      expect(row?.total_cost_usd_micros).toBe(expected);
+      expect(JSON.parse(row?.price_snapshot_json ?? "{}").longContextApplied).toBe(tiered);
+    }
+  });
+
+  test.each([null, ""])(
+    "does not apply request context tiers to aggregate usage with call ID %s",
+    async (nativeCallId) => {
+      const database = createUsageEventDatabase();
+      await recordRuntimeUsageEvent(database, {
+        callKey: "run_usage",
+        driverInstanceId: DRIVER_INSTANCE_ID,
+        nativeCallId,
+        run: { ...RUN_CONTEXT, model: "gpt-5.4", provider: "openai" },
+        usage: {
+          inputTokens: 360_000,
+          outputTokens: 0,
+          source: "prompt_response",
+          usageContract: "openai_total_with_cached_breakdown",
+        },
+      });
+      const row = await database
+        .prepare("SELECT total_cost_usd_micros, price_snapshot_json FROM usage_event")
+        .first<{ total_cost_usd_micros: number; price_snapshot_json: string }>();
+      expect(row?.total_cost_usd_micros).toBe(900_000);
+      expect(JSON.parse(row?.price_snapshot_json ?? "{}")).toMatchObject({
+        contextTiers: [],
+        longContextApplied: false,
+      });
+    },
+  );
 
   test("persists and idempotently updates reported USD cost without token counters", async () => {
     const database = createUsageEventDatabase();
@@ -408,6 +524,48 @@ describe("cost usage event", () => {
       total_cost_usd_micros: 840_000,
       usage_contract: "openai_total_with_cached_breakdown",
     });
+  });
+
+  test("transitions between token estimates and corrected runtime-reported USD", async () => {
+    const database = createUsageEventDatabase();
+    const input = {
+      callKey: "changing-usage",
+      driverInstanceId: DRIVER_INSTANCE_ID,
+      nativeCallId: "call-1",
+      run: { ...RUN_CONTEXT, model: "gpt-5.4", provider: "openai" },
+      usage: {
+        inputTokens: 100,
+        outputTokens: 0,
+        usageContract: "openai_total_with_cached_breakdown",
+      },
+    } satisfies RecordRuntimeUsageEventInput;
+    await recordRuntimeUsageEvent(database, input);
+    await recordRuntimeUsageEvent(database, {
+      ...input,
+      usage: {
+        costAmount: 0.42,
+        costCurrency: "USD",
+        usageContract: "openai_total_with_cached_breakdown",
+      },
+    });
+    const row = await database
+      .prepare("SELECT total_cost_usd_micros, price_snapshot_json FROM usage_event")
+      .first<{ total_cost_usd_micros: number; price_snapshot_json: string }>();
+    expect(row?.total_cost_usd_micros).toBe(420_000);
+    expect(JSON.parse(row?.price_snapshot_json ?? "{}").source).toBe("runtime_reported_usd");
+    await recordRuntimeUsageEvent(database, input);
+    expect(await database.prepare("SELECT total_cost_usd_micros FROM usage_event").first()).toEqual(
+      { total_cost_usd_micros: 250 },
+    );
+    database.execute(
+      "UPDATE usage_event SET pricing_status = 'unknown', price_snapshot_json = NULL, total_cost_usd_micros = 0",
+    );
+    await recordRuntimeUsageEvent(database, input);
+    expect(
+      await database
+        .prepare("SELECT pricing_status, total_cost_usd_micros FROM usage_event")
+        .first(),
+    ).toEqual({ pricing_status: "priced", total_cost_usd_micros: 250 });
   });
 
   test("uses reported USD cost for a known model when token counters are unavailable", async () => {
