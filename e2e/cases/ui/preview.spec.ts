@@ -16,6 +16,9 @@ const runId = createPreviewRunId();
 const smokeEmail = getPreviewSmokeEmail(runId);
 const smokeAgentName = `Preview smoke ${runId}`;
 
+// Playwright traces include filled values and request bodies containing the real provider key.
+test.use({ trace: "off" });
+
 async function sendPreviewMessageAndVerifyRealStream(page: Page, agentId: string): Promise<void> {
   await page.goto(`/agent/${agentId}?tab=preview`);
   await expect(page.getByTestId("agent-preview-panel")).toBeVisible();

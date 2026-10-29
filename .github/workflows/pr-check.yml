@@ -52,5 +52,8 @@ jobs:
       - name: Verify persisted Preview model selection
         run: just e2e e2e/cases/ui/preview-runtime-model.spec.ts
 
+      - name: Verify Preview credential dialogs
+        run: just e2e e2e/cases/ui/preview-credential-dialog.spec.ts
+
       - name: Verify native Host checkpoint recovery
         run: just test-native-host-checkpoint

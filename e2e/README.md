@@ -10,6 +10,8 @@ The Playwright specs live in `e2e/cases`. Run them from the repository root with
 
 `ui/preview-runtime-model.spec.ts` verifies the persisted Agent identity after reload, including rejected provider/model/Agent mismatches. Run it with `just e2e e2e/cases/ui/preview-runtime-model.spec.ts`. PR Check installs Chromium with `just e2e-browser-install` and executes this fixture suite after the repository check. This run needs no provider credentials and creates no model Session.
 
+`ui/preview-credential-dialog.spec.ts` verifies exact credential creation and default-selection inputs, including an existing default and other saved keys. It rejects a mismatched default-selection response. PR Check also executes this credential-free browser suite.
+
 ## Live specs
 
 `ui/preview.spec.ts` and `public-api/runtime.spec.ts` call real models. Start the local stack with `just dev` first: Playwright on its own starts only the console, without the API. They sign in through the local `@mosoo.ai` development login, so they cannot target a deployed environment.
@@ -17,6 +19,8 @@ The Playwright specs live in `e2e/cases`. Run them from the repository root with
 Choose the provider with `MOSOO_E2E_PROVIDER` and set its key, or the generic `MOSOO_E2E_PROVIDER_API_KEY`, which wins when both are set. Omitting the provider selects `openai`; a provider-specific key alone does not select that provider.
 
 Live specs fail preflight when required credentials are missing. Their real model calls need a separate, explicitly configured run.
+
+The live Preview spec disables Playwright traces because they include filled credential values and GraphQL request bodies. Do not manually start tracing while entering real keys.
 
 | `MOSOO_E2E_PROVIDER` | Specs                                              | Key                           | Notes                                                                                                    |
 | -------------------- | -------------------------------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------- |
