@@ -11,6 +11,7 @@ Which runtimes and models a Project can run, and how providers and model protoco
 - Custom providers are `openai-compatible` in the API. When a Project's only usable keys are custom, a new Agent in the console defaults to OpenCode; Pi or OpenAI Runtime runs custom models only when chosen explicitly. Pi's default is an incomplete placeholder until a preset model or a model declared on a custom credential is selected.
 - Pi preserves the installed native catalog’s capabilities, limits and prices for an exact provider and model match, including through the model proxy.
 - Pi’s advanced settings accept a thinking level; activation rejects levels that the selected native model cannot use. Omitting the setting keeps Pi’s default.
+- Pi retries a model call that fails with a rate limit, server error or dropped connection, with backoff, before the turn fails (the Driver’s `PI_SETTINGS`). Quota and billing errors are not retried, and a retry never repeats a tool call.
 - Publishing does not lock an Agent's runtime or model.
 
 ## Limits

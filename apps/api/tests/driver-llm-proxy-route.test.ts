@@ -384,6 +384,71 @@ describe("driver LLM proxy route", () => {
     35_000,
   );
 
+  test("lets native Pi retry a dropped upstream call and finish the turn", async () => {
+    const protocol = "openai-chat-completions";
+    const { bindings } = await setupFixture({
+      apiBase: "https://models.example.com/v1",
+      modelProtocol: protocol,
+      vendorId: "openai-compatible",
+    });
+    let modelCalls = 0;
+    const captured = captureUpstreamFetch(() => {
+      modelCalls += 1;
+      // A lost Worker-to-provider connection reaches Pi as the proxy's 502.
+      if (modelCalls === 1) throw new TypeError("Network connection lost.");
+      return piProxyProtocolResponse(protocol, modelCalls === 2);
+    });
+    const proxy = Bun.serve({
+      hostname: "127.0.0.1",
+      port: 0,
+      fetch: (request) => dispatch(bindings, request),
+    });
+    try {
+      const connection = await buildModelConnection({
+        bindings,
+        driverInstanceId: DRIVER_INSTANCE_ID,
+        profile: {
+          model: "pi-test",
+          modelProtocol: protocol,
+          runtimeId: "pi",
+          vendorCredential: {
+            apiBase: "https://models.example.com/v1",
+            credentialId: CREDENTIAL_ID,
+            projectId: PROJECT_ID,
+            models: ["pi-test"],
+            modelProtocol: protocol,
+            vendorId: "openai-compatible",
+          },
+        },
+        requestUrl: `http://127.0.0.1:${proxy.port}/api/sessions`,
+      });
+      const events = await runPiProxyTurn(connection, {
+        provider: "openai-compatible",
+        model: "pi-test",
+      });
+      expect(modelCalls).toBe(3);
+      expect(captured).toHaveLength(3);
+      expect(
+        events.filter((event) => String(event["type"]).startsWith("auto_retry_")),
+      ).toMatchObject([
+        { type: "auto_retry_start", attempt: 1, errorMessage: expect.stringContaining("502") },
+        { type: "auto_retry_end", attempt: 1, success: true },
+      ]);
+      expect(
+        events.some(
+          (event) =>
+            event["type"] === "tool_execution_end" &&
+            (JSON.stringify(event["result"]) ?? "").includes(PI_PROXY_TOOL_PROOF),
+        ),
+      ).toBe(true);
+      expect(JSON.stringify(events.findLast((event) => event["type"] === "agent_end"))).toContain(
+        PI_PROXY_FINAL_TEXT,
+      );
+    } finally {
+      await proxy.stop(true);
+    }
+  }, 35_000);
+
   test.each([
     {
       vendorId: "deepseek",
