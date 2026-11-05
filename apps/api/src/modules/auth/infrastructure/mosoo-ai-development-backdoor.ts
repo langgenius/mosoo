@@ -65,11 +65,14 @@ export function mosooAiDevelopmentBackdoorPlugin(): BetterAuthPlugin {
             ? existingUser.user.emailVerified
               ? existingUser.user
               : { ...existingUser.user, emailVerified: true }
-            : await ctx.context.internalAdapter.createUser({
-                email,
-                emailVerified: true,
-                name: deriveDevelopmentBackdoorNameFromEmail(email),
-              });
+            : await ctx.context.internalAdapter.createUser(
+                {
+                  email,
+                  emailVerified: true,
+                  name: deriveDevelopmentBackdoorNameFromEmail(email),
+                },
+                { method: "mosoo-ai-development-backdoor" },
+              );
 
           if (existingUser && !existingUser.user.emailVerified) {
             await ctx.context.internalAdapter.updateUser(existingUser.user.id, {
