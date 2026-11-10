@@ -219,7 +219,7 @@ async function createBindings(input: {
   return {
     bindings: {
       ...createPublicHttpTestBindings(input.database, {
-        fileBucket: bucket as unknown as R2Bucket,
+        fileBucket: bucket,
       }),
       runtimeSubjectHandleFactory: () => sandbox,
     } as ApiBindings,
