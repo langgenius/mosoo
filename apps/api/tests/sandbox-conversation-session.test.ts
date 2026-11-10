@@ -596,7 +596,7 @@ describe("ensureSandboxConversationSession", () => {
     });
 
     await ensureSandboxConversationSession(
-      createBindings(database, undefined, bucket as unknown as R2Bucket),
+      createBindings(database, undefined, bucket),
       createInput(sandbox, "cattle"),
     );
 

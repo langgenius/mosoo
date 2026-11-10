@@ -62,7 +62,7 @@ describe("driver instance socket registry", () => {
 
     expect(accepted).toHaveLength(1);
     expect(accepted[0]?.tags).toEqual(["driver"]);
-    expect(registry.getDriverSocket()).toBe(socket as unknown as WebSocket);
+    expect(registry.getDriverSocket()).toBe(socket);
   });
 
   test("finds the driver socket via tags after a hibernation wake", () => {
@@ -75,7 +75,7 @@ describe("driver instance socket registry", () => {
     // active socket; the tagged socket must still be discoverable.
     const wokenRegistry = new DriverInstanceSocketRegistry(ctx);
 
-    expect(wokenRegistry.getDriverSocket()).toBe(socket as unknown as WebSocket);
+    expect(wokenRegistry.getDriverSocket()).toBe(socket);
     expect(wokenRegistry.isActiveDriverSocket(socket as unknown as WebSocket)).toBe(true);
     expect(wokenRegistry.isSupersededDriverSocket(socket as unknown as WebSocket)).toBe(false);
   });
@@ -93,7 +93,7 @@ describe("driver instance socket registry", () => {
     expect(first.closes).toEqual([{ code: 1012, reason: "runtime.socket.replaced" }]);
     expect(registry.isSupersededDriverSocket(first as unknown as WebSocket)).toBe(true);
     expect(registry.isSupersededDriverSocket(second as unknown as WebSocket)).toBe(false);
-    expect(registry.getDriverSocket()).toBe(second as unknown as WebSocket);
+    expect(registry.getDriverSocket()).toBe(second);
   });
 
   test("does not treat the last closing socket as superseded", () => {

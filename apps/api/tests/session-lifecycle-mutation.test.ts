@@ -450,7 +450,7 @@ describe("session lifecycle mutations", () => {
     const bucket = new RetriableSessionFileBucket();
     const bindings = withSessionLifecycleBinding(
       createPublicHttpTestBindings(database, {
-        fileBucket: bucket as unknown as R2Bucket,
+        fileBucket: bucket,
       }) as ApiBindings,
     );
 

@@ -172,7 +172,9 @@ export const SESSION_PROCESS_EVENT_TYPE_CODES = {
 export const SESSION_PROCESS_EVENT_TYPE_BY_CODE = Object.fromEntries(
   Object.entries(SESSION_PROCESS_EVENT_TYPE_CODES).map(([type, code]) => [code, type]),
 ) as {
-  readonly [TType in SessionProcessEventType as (typeof SESSION_PROCESS_EVENT_TYPE_CODES)[TType]]: TType;
+  readonly [
+    TType in SessionProcessEventType as (typeof SESSION_PROCESS_EVENT_TYPE_CODES)[TType]
+  ]: TType;
 };
 
 export const SESSION_PROCESS_EVENT_STATUSES = ["available", "error", "unsupported"] as const;

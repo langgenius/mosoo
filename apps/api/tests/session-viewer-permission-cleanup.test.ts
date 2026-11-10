@@ -43,7 +43,7 @@ class MemoryAlarmStorage {
   }
 
   asStorage(): DurableObjectStorage {
-    return this as unknown as DurableObjectStorage;
+    return this;
   }
 }
 

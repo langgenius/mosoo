@@ -25,7 +25,7 @@ void mock.module("../../src/modules/runtime/infrastructure/driver-instance/do", 
 
 const { DriverConnection } =
   await import("../../src/adapters/durable-objects/driver-connection.do");
-const connection = new DriverConnection({} as never, {} as never);
+const connection = new DriverConnection({}, {});
 let settled = false;
 const pending = connection.alarm().then(() => {
   settled = true;

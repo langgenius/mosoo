@@ -47,7 +47,7 @@ async function setup(
       }),
       {
         ...createPublicHttpTestBindings(requestDatabase, {
-          fileBucket: bucket as unknown as R2Bucket,
+          fileBucket: bucket,
           ...options,
         }),
       } as ApiBindings,
