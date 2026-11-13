@@ -124,12 +124,13 @@ function createRuntimeUsageEventInsert(database: AppDatabase, input: RecordRunti
     usageContract,
   });
   const cost = calculateUsageCost({
+    // Unidentified reports can aggregate multiple requests in one turn.
+    contextTiersAvailable: isTruthy(input.nativeCallId),
     cacheCreationTokens: tokens.cacheCreationTokens,
     cacheReadTokens: tokens.cacheReadTokens,
     inputTokens: tokens.inputTokens,
     model,
     outputTokens: tokens.outputTokens,
-    pricedAtMs: input.run.createdAtMs,
     providedCostUsd: toProvidedUsdCost(input.usage),
     provider,
   });
@@ -164,6 +165,44 @@ function createRuntimeUsageEventInsert(database: AppDatabase, input: RecordRunti
   });
 }
 
+// Keep the recorded catalog when a replay corrects a call's counters. Older
+// snapshots carry only their selected rates; new snapshots also retain tiers.
+function recordedPricingExpressions() {
+  const snapshot = usageEventsTable.priceSnapshotJson;
+  const tier = sql`(SELECT value FROM json_each(${snapshot}, '$.contextTiers')
+    WHERE json_extract(value, '$.thresholdTokens') < excluded.input_tokens + excluded.cache_creation_tokens
+    ORDER BY json_extract(value, '$.thresholdTokens') DESC LIMIT 1)`;
+  const rate = (key: string) => sql`COALESCE(
+    json_extract(${tier}, ${`$.${key}`}),
+    json_extract(${snapshot}, ${`$.baseRates.${key}`}),
+    json_extract(${snapshot}, ${`$.${key}`}))`;
+  const input = rate("inputUsdPerMillion");
+  const output = rate("outputUsdPerMillion");
+  const read = rate("cacheReadUsdPerMillion");
+  const write = rate("cacheWriteUsdPerMillion");
+  const billableInput = sql`MAX(0, excluded.input_tokens - excluded.cache_read_tokens)`;
+  const retain = sql`${usageEventsTable.model} = excluded.model
+    AND ${usageEventsTable.provider} = excluded.provider
+    AND excluded.input_tokens + excluded.output_tokens + excluded.cache_creation_tokens + excluded.cache_read_tokens > 0
+    AND json_extract(${snapshot}, '$.inputUsdPerMillion') IS NOT NULL`;
+  return {
+    snapshot: sql`CASE WHEN ${retain} THEN json_set(${snapshot},
+      '$.billableInputTokens', ${billableInput},
+      '$.inputUsdPerMillion', ${input}, '$.outputUsdPerMillion', ${output},
+      '$.cacheReadUsdPerMillion', ${read}, '$.cacheWriteUsdPerMillion', ${write},
+      '$.longContextApplied', json(CASE WHEN CASE
+        WHEN json_type(${snapshot}, '$.baseRates') IS NULL
+          THEN COALESCE(json_extract(${snapshot}, '$.longContextApplied'), 0)
+        ELSE ${tier} IS NOT NULL END THEN 'true' ELSE 'false' END))
+      ELSE excluded.price_snapshot_json END`,
+    status: sql`CASE WHEN ${retain} THEN ${usageEventsTable.pricingStatus} ELSE excluded.pricing_status END`,
+    cost: sql`CASE WHEN ${retain} THEN CAST(ROUND(
+      ${billableInput} * ${input} + excluded.output_tokens * ${output}
+      + excluded.cache_read_tokens * ${read} + excluded.cache_creation_tokens * ${write}
+    ) AS INTEGER) ELSE excluded.total_cost_usd_micros END`,
+  };
+}
+
 export function createRuntimeUsageEventUpsert(
   database: AppDatabase,
   input: RecordRuntimeUsageEventInput,
@@ -174,6 +213,7 @@ export function createRuntimeUsageEventUpsert(
     return null;
   }
 
+  const recorded = recordedPricingExpressions();
   return query.onConflictDoUpdate({
     set: {
       cacheCreationTokens: sql`excluded.cache_creation_tokens`,
@@ -181,10 +221,10 @@ export function createRuntimeUsageEventUpsert(
       inputTokens: sql`excluded.input_tokens`,
       model: sql`excluded.model`,
       outputTokens: sql`excluded.output_tokens`,
-      priceSnapshotJson: sql`excluded.price_snapshot_json`,
-      pricingStatus: sql`excluded.pricing_status`,
+      priceSnapshotJson: recorded.snapshot,
+      pricingStatus: recorded.status,
       provider: sql`excluded.provider`,
-      totalCostUsdMicros: sql`excluded.total_cost_usd_micros`,
+      totalCostUsdMicros: recorded.cost,
       usageContract: sql`excluded.usage_contract`,
     },
     target: [usageEventsTable.source, usageEventsTable.sourceEventId],
