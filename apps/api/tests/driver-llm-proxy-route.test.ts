@@ -75,7 +75,7 @@ function createDriverRouteTestApp(): Hono<ApiGatewayEnvironment> {
 function captureUpstreamFetch(response?: () => Response): CapturedUpstreamRequest[] {
   const captured: CapturedUpstreamRequest[] = [];
 
-  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+  globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const request = new Request(input, init);
     captured.push({
       body: request.method === "GET" || request.method === "HEAD" ? null : await request.text(),
@@ -97,7 +97,7 @@ function captureUpstreamFetch(response?: () => Response): CapturedUpstreamReques
         status: 200,
       })
     );
-  }) as typeof fetch;
+  };
 
   return captured;
 }
@@ -1346,9 +1346,9 @@ describe("driver LLM proxy route", () => {
 
   test("maps upstream failures to 502", async () => {
     const { bindings } = await setupFixture();
-    globalThis.fetch = (async () => {
+    globalThis.fetch = async () => {
       throw new Error("boom");
-    }) as typeof fetch;
+    };
     const grant = await createLlmProxyGrant(bindings);
 
     const response = await dispatch(

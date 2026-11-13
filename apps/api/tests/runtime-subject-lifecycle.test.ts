@@ -254,7 +254,7 @@ function createSandboxHandle(
     startProcess: unavailable,
     unmountBucket: unavailable,
     writeFile: unavailable,
-  } as SandboxHandle;
+  };
 }
 
 function createBindings(
@@ -274,7 +274,7 @@ function createBindings(
     DB: database,
     SANDBOX_FILE_BUCKET_LOCAL: "true",
     runtimeSubjectHandleFactory: () => createSandboxHandle(options),
-  } as unknown as ApiBindings;
+  };
 }
 
 describe("runtime subject lifecycle machine", () => {

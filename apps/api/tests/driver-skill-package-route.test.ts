@@ -70,7 +70,7 @@ describe("driver skill package route", () => {
     const database = await createPublicHttpContractDatabase();
     const bucket = new PublicApiMemoryFileBucket();
     const bindings = createPublicHttpTestBindings(database, {
-      fileBucket: bucket as unknown as R2Bucket,
+      fileBucket: bucket,
     }) as ApiBindings;
 
     await insertSkillSnapshot(database);
