@@ -62,7 +62,7 @@ if (process.env.MOSOO_TEST_SANDBOX_WRAPPER === "1") {
         },
       },
     };
-    const sandbox = new Sandbox(ctx as unknown as DurableObjectState, {} as ApiBindings);
+    const sandbox = new Sandbox(ctx, {} as ApiBindings);
     return { sandbox, reads: () => reads };
   }
 

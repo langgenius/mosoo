@@ -227,7 +227,7 @@ async function createFixture(input: { archiveBytes?: Uint8Array } = {}) {
   const database = await createPublicHttpContractDatabase();
   const bucket = new MemoryByteBucket();
   const bindings = createPublicHttpTestBindings(database, {
-    fileBucket: bucket as unknown as R2Bucket,
+    fileBucket: bucket,
   }) as ApiBindings;
   const archiveBytes =
     input.archiveBytes ?? createAgentPackageArchiveBytes(createPackageFixture(input));

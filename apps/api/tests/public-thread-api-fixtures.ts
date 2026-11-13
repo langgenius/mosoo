@@ -230,7 +230,7 @@ export function createPublicEventSessionNamespace(): {
     binding: {
       get: () => stub,
       idFromName: (name: string) => name,
-    } as unknown as ApiBindings["Session"],
+    },
     close: () => {
       for (const socket of sockets) {
         socket.close();

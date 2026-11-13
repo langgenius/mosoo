@@ -622,7 +622,7 @@ describe("Session runtime maintenance", () => {
       idFromName: (name: string) => name,
     };
     await restartSessionDriver(
-      { ...bindings, DriverConnection: driverConnection } as unknown as ApiBindings,
+      { ...bindings, DriverConnection: driverConnection },
       OWNER_VIEWER,
       input,
     );

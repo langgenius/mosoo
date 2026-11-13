@@ -96,7 +96,7 @@ async function createReadyProjectDraftFile(input: {
   name: string;
 }): Promise<string> {
   const bindings = createPublicHttpTestBindings(input.database, {
-    fileBucket: input.bucket as unknown as R2Bucket,
+    fileBucket: input.bucket,
   }) as ApiBindings;
   const fileBytes = new TextEncoder().encode(input.body);
   const upload = await fileStore.createUpload(bindings, OWNER_VIEWER, {
@@ -135,7 +135,7 @@ async function createPendingProjectDraftFile(input: {
   name: string;
 }): Promise<string> {
   const bindings = createPublicHttpTestBindings(input.database, {
-    fileBucket: input.bucket as unknown as R2Bucket,
+    fileBucket: input.bucket,
   }) as ApiBindings;
   const fileBytes = new TextEncoder().encode(input.body);
   const upload = await fileStore.createUpload(bindings, OWNER_VIEWER, {
@@ -1249,7 +1249,7 @@ describe("Public Thread API e2e", () => {
     const app = createPublicThreadApiTestApp();
     const bucket = new PublicApiMemoryFileBucket();
     const requestThreadApi = (request: Request) =>
-      requestPublicApi(app, database, request, { fileBucket: bucket as unknown as R2Bucket });
+      requestPublicApi(app, database, request, { fileBucket: bucket });
 
     {
       const createThreadResponse = await requestThreadApi(
@@ -1573,7 +1573,7 @@ describe("Public Thread API e2e", () => {
     const app = createPublicThreadApiTestApp();
     const bucket = new PublicApiMemoryFileBucket();
     const requestThreadApi = (request: Request) =>
-      requestPublicApi(app, database, request, { fileBucket: bucket as unknown as R2Bucket });
+      requestPublicApi(app, database, request, { fileBucket: bucket });
 
     {
       const fileBody = "Launch note.\n";
@@ -1793,7 +1793,7 @@ describe("Public Thread API e2e", () => {
     const app = createPublicThreadApiTestApp();
     const bucket = new PublicApiMemoryFileBucket();
     const requestThreadApi = (request: Request) =>
-      requestPublicApi(app, database, request, { fileBucket: bucket as unknown as R2Bucket });
+      requestPublicApi(app, database, request, { fileBucket: bucket });
     const threadId = generatedPublicThreadId(130);
 
     await insertPublicThread(database, {

@@ -140,7 +140,7 @@ function createBindings(database: D1Database): ApiBindings {
       delete: async () => {},
     },
     Sandbox: {},
-  } as unknown as ApiBindings;
+  };
 }
 
 function requireRuntimeOperationId(value: string | null | undefined): RuntimeOperationId {
@@ -207,7 +207,7 @@ function createSandboxHandle(): SandboxHandle {
     startProcess: unavailable,
     unmountBucket: unavailable,
     writeFile: unavailable,
-  } as SandboxHandle;
+  };
 }
 
 describe("runtime subject recycle", () => {
