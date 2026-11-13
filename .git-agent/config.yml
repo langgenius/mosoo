@@ -1,0 +1,11 @@
+scopes:
+    - name: app
+      description: API service and frontend application in apps/; does not cover shared packages in pkgs/.
+    - name: infra
+      description: Toolchain, shared build setup, and hooks in config/; does not cover workflow pipelines.
+    - name: e2e
+      description: End-to-end tests, live runtime smoke tests, and harnesses in e2e/; does not cover unit tests.
+    - name: pkgs
+      description: Shared packages, UI libraries, and domain contracts in pkgs/; does not cover application code in apps/.
+    - name: ops
+      description: Deployment scripts, container monitoring, and automation scripts in scripts/; does not cover runtime app code.
