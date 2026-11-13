@@ -26,6 +26,7 @@ import { readSkillPackageBytesFromSnapshot } from "../../../modules/skills/appli
 import { createErrorLogContext, logError, logWarn } from "../../../platform/cloudflare/logger";
 import type { ApiGatewayEnvironment } from "../../../platform/cloudflare/worker-types";
 import { toArrayBuffer } from "../../../shared/bytes";
+import { redactProviderCredentials } from "../../../shared/provider-error";
 import { isTruthy } from "../../../shared/truthiness";
 import { platformIdRouteErrorMessage } from "./platform-id-route-error";
 
@@ -325,7 +326,20 @@ function buildLlmProxyUpstreamHeaders(incoming: Headers, target: RuntimeLlmProxy
     const lowered = key.toLowerCase();
 
     if (!HOP_BY_HOP_HEADERS.has(lowered) && !LLM_PROXY_GRANT_HEADERS.has(lowered)) {
-      headers.set(key, value);
+      if (target.vendor.vendorId !== "opencode-go" || !lowered.startsWith("x-opencode-"))
+        headers.set(key, value);
+    }
+  }
+
+  if (target.vendor.vendorId === "opencode-go") {
+    // Bind Go routing/cache identity to the Host conversation, not a replaceable
+    // Driver or a sandbox-supplied header. The raw provider key stays in Host.
+    if (target.sessionId === undefined)
+      throw new RuntimeLlmProxyError("Go session is unavailable.", 403);
+    headers.set("User-Agent", target.userAgent);
+    headers.set("x-opencode-session", target.sessionId);
+    if (target.modelProtocol === "anthropic-messages" && !headers.has("anthropic-version")) {
+      headers.set("anthropic-version", "2023-06-01");
     }
   }
 
@@ -359,6 +373,28 @@ function buildLlmProxyUpstreamHeaders(incoming: Headers, target: RuntimeLlmProxy
   return headers;
 }
 
+async function readSafeProviderError(response: Response, apiKey: string): Promise<string> {
+  const reader = response.body?.getReader();
+  if (reader === undefined) return "";
+  const chunks: Uint8Array[] = [];
+  let bytes = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    bytes += value.byteLength;
+    if (bytes > 64 * 1024) {
+      await reader.cancel();
+      return JSON.stringify({ error: "Provider request failed." });
+    }
+    chunks.push(value);
+  }
+  const decoder = new TextDecoder();
+  return redactProviderCredentials(
+    chunks.map((chunk) => decoder.decode(chunk, { stream: true })).join("") + decoder.decode(),
+    apiKey,
+  );
+}
+
 async function proxyRuntimeLlmRequest(
   request: Request,
   subPath: string,
@@ -381,11 +417,27 @@ async function proxyRuntimeLlmRequest(
     init,
   );
 
-  return new Response(response.body, {
-    headers: copyProxyResponseHeaders(response.headers),
-    status: response.status,
-    statusText: response.statusText,
-  });
+  const protectGoError = target.vendor.vendorId === "opencode-go" && !response.ok;
+  const headers = copyProxyResponseHeaders(response.headers);
+  if (protectGoError) {
+    for (const [name, value] of headers) {
+      headers.set(name, redactProviderCredentials(value, target.apiKey));
+    }
+    for (const name of ["content-encoding", "content-md5", "digest", "content-digest", "etag"])
+      headers.delete(name);
+  }
+  return new Response(
+    protectGoError && response.body !== null
+      ? await readSafeProviderError(response, target.apiKey)
+      : response.body,
+    {
+      headers,
+      status: response.status,
+      statusText: protectGoError
+        ? redactProviderCredentials(response.statusText, target.apiKey)
+        : response.statusText,
+    },
+  );
 }
 
 async function proxyRuntimeMcpRequest(
@@ -574,6 +626,7 @@ export function registerDriverRoute(app: Hono<ApiGatewayEnvironment>) {
     try {
       target = await resolveRuntimeLlmProxyTarget(c.env, {
         credentialId: grant.resourceId,
+        driverInstanceId: grant.driverInstanceId,
         modelProtocol: grant.modelProtocol,
         projectId: grant.projectId,
       });

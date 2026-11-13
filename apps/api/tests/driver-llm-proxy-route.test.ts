@@ -3,17 +3,19 @@ import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import type { PresetModelProtocol } from "@mosoo/contracts/models";
 import { driverInstancesTable, vendorCredentialsTable } from "@mosoo/db";
 import { parsePlatformId } from "@mosoo/id";
-import type { DriverInstanceId, ProjectId, VendorCredentialId } from "@mosoo/id";
+import type { AccountId, DriverInstanceId, ProjectId, VendorCredentialId } from "@mosoo/id";
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 
 import { registerDriverRoute } from "../src/adapters/http/routes/driver-route";
+import { getAccountViewer } from "../src/modules/auth/application/viewer-auth.service";
 import { getRuntimeDriverLlmProxyPath } from "../src/modules/runtime/domain/runtime-driver-routes";
 import { finalizeDriverInstance } from "../src/modules/runtime/infrastructure/driver-instance/lifecycle";
 import { createRuntimeActionToken } from "../src/modules/runtime/infrastructure/runtime-boot-token";
 import type { RuntimeActionTokenPayload } from "../src/modules/runtime/infrastructure/runtime-boot-token";
 import { buildModelConnection } from "../src/modules/runtime/infrastructure/runtime-sandbox-provisioning/runtime-model-connection.builder";
 import { storeSecret } from "../src/modules/vault/application/vault-secret-store";
+import { testVendorCredential } from "../src/modules/vendor-credentials/application/vendor-credential-test";
 import { runWithRequestLogContext } from "../src/platform/cloudflare/logger";
 import type { ApiBindings, ApiGatewayEnvironment } from "../src/platform/cloudflare/worker-types";
 import {
@@ -1362,3 +1364,290 @@ describe("driver LLM proxy route", () => {
     expect(await response.json()).toEqual({ error: "LLM proxy upstream request failed." });
   });
 });
+
+describe("OpenCode Go subscription routing", () => {
+  test.each([
+    ["openai-chat-completions", "/chat/completions", "deepseek-v4.1-flash"],
+    ["anthropic-messages", "/messages", "minimax-m2.7"],
+    ["openai-responses", "/responses", "gpt-5.6-luna"],
+  ] as const)(
+    "Given Go %s, When the Driver is replaced, Then proxy auth and conversation identity stay stable",
+    async (modelProtocol, path, modelId) => {
+      const { bindings, database } = await setupFixture({ vendorId: "opencode-go" });
+      bindings.CF_VERSION_METADATA = { id: "go-release-a", tag: "", timestamp: "" };
+      const captured = captureUpstreamFetch();
+      for (const driverInstanceId of [DRIVER_INSTANCE_ID, OTHER_DRIVER_INSTANCE_ID]) {
+        if (driverInstanceId === OTHER_DRIVER_INSTANCE_ID) {
+          bindings.CF_VERSION_METADATA = { id: "go-release-b", tag: "", timestamp: "" };
+          await database
+            .app()
+            .update(driverInstancesTable)
+            .set({ status: "failed" })
+            .where(eq(driverInstancesTable.id, DRIVER_INSTANCE_ID))
+            .run();
+          await insertDriverInstance(database, "ready", { driverInstanceId });
+        }
+        const grant = await createLlmProxyGrant(bindings, {
+          driverInstanceId,
+          modelProtocol,
+          modelId,
+        });
+        const response = await dispatch(
+          bindings,
+          llmProxyRequest(path, {
+            method: "POST",
+            headers: {
+              authorization: `Bearer ${grant}`,
+              "content-type": "application/json",
+              "user-agent": "generic-sdk/1.0",
+              "x-opencode-session": "untrusted-session",
+              "x-opencode-custom-routing": "untrusted-route",
+            },
+            body: JSON.stringify({ model: modelId, stream: true, messages: [], input: "test" }),
+          }),
+        );
+        expect(response.status).toBe(200);
+        const upstream = captured.at(-1)!;
+        expect(upstream.url).toBe(`https://opencode.ai/zen/go/v1${path}`);
+        expect(upstream.headers.get("authorization")).toBe(`Bearer ${UPSTREAM_API_KEY}`);
+        expect(upstream.headers.get("user-agent")).toBe(`mosoo/${bindings.CF_VERSION_METADATA.id}`);
+        expect(upstream.headers.get("x-opencode-session")).toBe(PUBLIC_API_TEST_IDS.ownerSession);
+        expect(upstream.headers.get("x-api-key")).toBeNull();
+        expect(upstream.headers.has("x-opencode-custom-routing")).toBe(false);
+        expect(JSON.stringify([...upstream.headers])).not.toContain(grant);
+      }
+      await database
+        .app()
+        .update(driverInstancesTable)
+        .set({ status: "failed" })
+        .where(eq(driverInstancesTable.id, OTHER_DRIVER_INSTANCE_ID))
+        .run();
+      const revoked = await createLlmProxyGrant(bindings, {
+        driverInstanceId: OTHER_DRIVER_INSTANCE_ID,
+        modelProtocol,
+        modelId,
+      });
+      expect(
+        (
+          await dispatch(
+            bindings,
+            llmProxyRequest(path, {
+              method: "POST",
+              headers: { authorization: `Bearer ${revoked}` },
+              body: JSON.stringify({ model: modelId }),
+            }),
+          )
+        ).status,
+      ).toBe(403);
+      expect(captured).toHaveLength(2);
+    },
+  );
+});
+
+test.each([["openai-chat-completions", "/chat/completions", "deepseek-v4.1-flash"]] as const)(
+  "Given Go %s, When real OpenCode and Pi call a tool, Then the Host uses the Go wire contract",
+  async (modelProtocol, path, modelId) => {
+    const { bindings } = await setupFixture({ vendorId: "opencode-go" });
+    bindings.CF_VERSION_METADATA = { id: "go-cli-release", tag: "", timestamp: "" };
+    for (const runtimeId of ["acp-fallback", "pi"] as const) {
+      let calls = 0;
+      const captured = captureUpstreamFetch(() =>
+        piProxyProtocolResponse(modelProtocol, ++calls === 1),
+      );
+      const proxy = Bun.serve({
+        hostname: "127.0.0.1",
+        port: 0,
+        fetch: (request) => dispatch(bindings, request),
+      });
+      try {
+        const connection = await buildModelConnection({
+          bindings,
+          driverInstanceId: DRIVER_INSTANCE_ID,
+          profile: {
+            model: modelId,
+            modelProtocol,
+            runtimeId,
+            vendorCredential: {
+              apiBase: null,
+              credentialId: CREDENTIAL_ID,
+              projectId: PROJECT_ID,
+              models: [modelId],
+              vendorId: "opencode-go",
+            },
+          },
+          requestUrl: `http://127.0.0.1:${proxy.port}/api/sessions`,
+        });
+        const events =
+          runtimeId === "pi"
+            ? await runPiProxyTurn(connection, { provider: "opencode-go", model: modelId })
+            : await runOpenCodeProxyTurn(connection, { provider: "opencode-go", model: modelId });
+        expect(calls).toBe(2);
+        expect(JSON.stringify(events)).toContain(PI_PROXY_TOOL_PROOF);
+        expect(JSON.stringify(events)).toContain(PI_PROXY_FINAL_TEXT);
+        expect(captured[1]?.body).toContain(PI_PROXY_TOOL_PROOF);
+        const completedMessages = events.filter((event) => {
+          if (runtimeId === "acp-fallback") return event["type"] === "step_finish";
+          const message = event["message"];
+          return (
+            event["type"] === "message_end" &&
+            typeof message === "object" &&
+            message !== null &&
+            "role" in message &&
+            message.role === "assistant"
+          );
+        });
+        expect(completedMessages).toHaveLength(2);
+        for (const message of completedMessages) {
+          expect(message).toMatchObject(
+            runtimeId === "pi"
+              ? { message: { usage: { input: 10, output: 10 } } }
+              : { part: { tokens: { input: 10, output: 10 } } },
+          );
+        }
+        for (const request of captured) {
+          const upstreamUrl = new URL(request.url);
+          expect(upstreamUrl.origin + upstreamUrl.pathname).toBe(
+            `https://opencode.ai/zen/go/v1${path}`,
+          );
+          expect(upstreamUrl.search).toBe("");
+          expect(request.headers.get("authorization")).toBe(`Bearer ${UPSTREAM_API_KEY}`);
+          expect(request.headers.get("x-api-key")).toBeNull();
+          expect(request.headers.get("user-agent")).toBe(
+            `mosoo/${bindings.CF_VERSION_METADATA.id}`,
+          );
+          expect(request.headers.get("x-opencode-session")).toBe(PUBLIC_API_TEST_IDS.ownerSession);
+          const grant = connection.proxyGrant;
+          expect(JSON.stringify([...request.headers])).not.toContain(grant);
+          expect(request.body).not.toContain(grant);
+        }
+      } finally {
+        await proxy.stop(true);
+      }
+    }
+  },
+  60_000,
+);
+
+test("Given Host version metadata, When testing a Go key without a model, Then the default inference probe uses that deployment", async () => {
+  const { bindings } = await setupFixture({ vendorId: "opencode-go" });
+  bindings.CF_VERSION_METADATA = { id: "go-host-probe", tag: "", timestamp: "" };
+  const viewer = await getAccountViewer(bindings.DB, PUBLIC_API_TEST_IDS.ownerAccount as AccountId);
+  if (viewer === null) throw new Error("Missing fixture viewer");
+  const captured = captureUpstreamFetch(() =>
+    Response.json({ choices: [{ message: { content: "pong" } }] }),
+  );
+  const result = await testVendorCredential(bindings, viewer, {
+    projectId: PROJECT_ID,
+    apiKey: "probe-key",
+    vendorId: "opencode-go",
+  });
+  expect(result.ok).toBe(true);
+  expect(captured).toHaveLength(1);
+  expect(captured[0]?.method).toBe("POST");
+  expect(JSON.parse(captured[0]?.body ?? "{}")).toMatchObject({ model: "deepseek-v4.1-flash" });
+  expect(captured[0]?.headers.get("user-agent")).toBe("mosoo/go-host-probe");
+});
+
+test.each([401, 429, 500])(
+  "Go upstream %s errors do not expose the provider key",
+  async (status) => {
+    const { bindings } = await setupFixture({ vendorId: "opencode-go" });
+    captureUpstreamFetch(
+      () => new Response(`Rejected Bearer ${UPSTREAM_API_KEY}; oc_sk_echoed-secret`, { status }),
+    );
+    const grant = await createLlmProxyGrant(bindings, {
+      modelProtocol: "openai-chat-completions",
+      modelId: "deepseek-v4.1-flash",
+    });
+    const response = await dispatch(
+      bindings,
+      llmProxyRequest("/chat/completions", {
+        method: "POST",
+        headers: { authorization: `Bearer ${grant}` },
+        body: JSON.stringify({ model: "deepseek-v4.1-flash" }),
+      }),
+    );
+    expect(response.status).toBe(status);
+    const body = await response.text();
+    expect(body).not.toContain(UPSTREAM_API_KEY);
+    expect(body).not.toContain("oc_sk_echoed-secret");
+  },
+);
+
+test.each(["chunked", "oversized"] as const)(
+  "Go %s error responses are bounded and sanitized",
+  async (kind) => {
+    const { bindings } = await setupFixture({ vendorId: "opencode-go" });
+    captureUpstreamFetch(
+      () =>
+        new Response(
+          new ReadableStream({
+            start(controller) {
+              for (const chunk of kind === "chunked"
+                ? ["sk-real-", "upstream-key"]
+                : ["x".repeat(65536), UPSTREAM_API_KEY])
+                controller.enqueue(new TextEncoder().encode(chunk));
+              controller.close();
+            },
+          }),
+          { status: 500 },
+        ),
+    );
+    const grant = await createLlmProxyGrant(bindings, {
+      modelProtocol: "openai-chat-completions",
+      modelId: "deepseek-v4.1-flash",
+    });
+    const response = await dispatch(
+      bindings,
+      llmProxyRequest("/chat/completions", {
+        method: "POST",
+        headers: { authorization: `Bearer ${grant}` },
+        body: JSON.stringify({ model: "deepseek-v4.1-flash" }),
+      }),
+    );
+    expect(response.status).toBe(500);
+    const body = await response.text();
+    expect(body).not.toContain(UPSTREAM_API_KEY);
+    if (kind === "oversized")
+      expect(body).toBe(JSON.stringify({ error: "Provider request failed." }));
+  },
+);
+
+test.each([304, 400])(
+  "Go %s errors redact headers and preserve bodyless responses",
+  async (status) => {
+    const { bindings } = await setupFixture({ vendorId: "opencode-go" });
+    captureUpstreamFetch(
+      () =>
+        new Response(status === 304 ? null : "failure", {
+          status,
+          headers: {
+            location: `https://example.com/${UPSTREAM_API_KEY}`,
+            "x-provider-error": UPSTREAM_API_KEY,
+            "content-encoding": "identity",
+            "content-md5": "old-digest",
+            etag: "old-etag",
+            digest: "old-digest",
+            "content-digest": "old-digest",
+          },
+        }),
+    );
+    const grant = await createLlmProxyGrant(bindings, {
+      modelProtocol: "openai-chat-completions",
+      modelId: "deepseek-v4.1-flash",
+    });
+    const response = await dispatch(
+      bindings,
+      llmProxyRequest("/chat/completions", {
+        method: "POST",
+        headers: { authorization: `Bearer ${grant}` },
+        body: JSON.stringify({ model: "deepseek-v4.1-flash" }),
+      }),
+    );
+    expect(response.status).toBe(status);
+    expect(JSON.stringify([...response.headers])).not.toContain(UPSTREAM_API_KEY);
+    for (const header of ["content-encoding", "content-md5", "etag", "digest", "content-digest"])
+      expect(response.headers.has(header)).toBe(false);
+    if (status === 304) expect(response.body).toBeNull();
+  },
+);

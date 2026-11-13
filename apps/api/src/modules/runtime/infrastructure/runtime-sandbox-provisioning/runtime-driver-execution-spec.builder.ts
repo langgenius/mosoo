@@ -202,10 +202,10 @@ export async function buildExecutionSpec(
     provider: input.profile.provider,
     providerOptions: input.profile.providerOptions,
     session: {
-      // Host cache and native HOME are provisioned separately; they are not
-      // optional directories requested from the OpenCode ACP provider.
+      // Host cache and native HOME are provisioned separately from optional
+      // directories advertised to the runtime CLI.
       additionalDirectories:
-        input.profile.runtimeId === "acp-fallback"
+        input.profile.runtimeId === "acp-fallback" || input.profile.runtimeId === "pi"
           ? []
           : listProvisioningDirectories(input.profile),
       context: {

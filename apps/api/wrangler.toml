@@ -4,6 +4,9 @@ compatibility_date = "2026-06-01"
 compatibility_flags = ["nodejs_compat"]
 keep_vars = true
 
+[version_metadata]
+binding = "CF_VERSION_METADATA"
+
 [observability]
 enabled = true
 
@@ -157,6 +160,9 @@ workers_dev = true
 
 # Stage mirrors production behavior and topology but uses isolated resources
 # and synthetic data behind its workers.dev origin.
+[env.stage.version_metadata]
+binding = "CF_VERSION_METADATA"
+
 [env.stage.observability]
 enabled = true
 
@@ -307,6 +313,9 @@ dead_letter_queue = "mosoo-stage-api-command-dlq"
 [env.prod]
 name = "mosoo-api-prod"
 workers_dev = false
+
+[env.prod.version_metadata]
+binding = "CF_VERSION_METADATA"
 
 # Named envs do not inherit the top-level [observability] block, so prod had no
 # queryable Workers Logs (only traces). Enable logs so structured log lines

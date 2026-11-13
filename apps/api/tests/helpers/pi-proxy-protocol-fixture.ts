@@ -61,7 +61,17 @@ export function piProxyProtocolResponse(protocol: PresetModelProtocol, tool: boo
         model: "pi-test",
         choices: [{ index: 0, delta: value, finish_reason: finish }],
       });
-      return sse([chunk(delta, null), chunk({}, tool ? "tool_calls" : "stop")]);
+      return sse([
+        chunk(delta, null),
+        chunk({}, tool ? "tool_calls" : "stop"),
+        {
+          id: "chat_proxy",
+          object: "chat.completion.chunk",
+          model: "pi-test",
+          choices: [],
+          usage: { prompt_tokens: 10, completion_tokens: 10, total_tokens: 20 },
+        },
+      ]);
     }
     case "anthropic-messages":
       return sse([
@@ -326,6 +336,10 @@ export async function runPiProxyTurn(
 /** Real pinned OpenCode CLI using Driver-rendered provider configuration. */
 export async function runOpenCodeProxyTurn(
   modelConnection: DriverModelConnection,
+  input: Pick<PiProxyModel, "provider" | "model"> = {
+    provider: "openai-compatible",
+    model: "pi-test",
+  },
 ): Promise<Record<string, unknown>[]> {
   const home = await mkdtemp(join(tmpdir(), "mosoo-opencode-proxy-"));
   const executable = fileURLToPath(
@@ -340,7 +354,7 @@ export async function runOpenCodeProxyTurn(
       "--format",
       "json",
       "--model",
-      "openai-compatible/pi-test",
+      `${input.provider}/${input.model}`,
       "--title",
       "Protocol integration fixture",
       "Run the provided bash tool and then finish.",
@@ -351,8 +365,7 @@ export async function runOpenCodeProxyTurn(
         PATH: process.env["PATH"] ?? "",
         OPENCODE_API_KEY: modelConnection.proxyGrant,
         OPENCODE_CONFIG_CONTENT: buildOpenCodeModelConfig({
-          model: "pi-test",
-          provider: "openai-compatible",
+          ...input,
           modelConnection,
         }),
         HOME: home,

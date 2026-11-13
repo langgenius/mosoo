@@ -19,6 +19,7 @@ export interface SessionEventProcessRow extends StreamFoldableSessionEventRow {
   tool_call_id: string | null;
   tool_input_json: string | null;
   tool_name: string | null;
+  usage_key?: string | null;
 }
 
 export function sessionEventThoughtColumns() {
@@ -156,6 +157,15 @@ export async function readSessionEventRowsAfterSeq(
       tool_input_json: sessionEventsTable.toolInputJson,
       tool_name: sessionEventsTable.toolName,
       tokens: sessionEventsTable.tokens,
+      usage_key: sql<string | null>`CASE
+        WHEN ${sessionEventsTable.eventType} = 'usage.updated'
+          AND ${sessionEventsTable.canonicalEventJson} IS NOT NULL
+        THEN COALESCE(json_extract(${sessionEventsTable.canonicalEventJson}, '$.payload.callId'), '')
+        END`.mapWith((value: string) => {
+        // Match the ledger's JavaScript trim, including non-space whitespace.
+        const callId = value.trim();
+        return callId.length > 0 ? `model_call:${callId}` : "run_usage";
+      }),
     })
     .from(sessionEventsTable)
     .where(rangeConditions({ ...input, throughSeq }))

@@ -114,7 +114,7 @@ export interface SessionUsageSummary {
   outputTokens?: number | null;
   provider?: string | null;
   size?: number | null;
-  source: "prompt_response" | "session_update";
+  source: "native_step_totals" | "prompt_response" | "session_update";
   thoughtTokens?: number | null;
   totalTokens?: number | null;
   usageContract?:

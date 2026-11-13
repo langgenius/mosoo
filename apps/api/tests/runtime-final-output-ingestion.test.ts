@@ -711,6 +711,43 @@ describe("runtime final output ingestion", () => {
     });
   });
 
+  test("persists native step totals before committing the checkpoint and Run", async () => {
+    const { bindings, database } = await createCheckpointCompletionFixture();
+    await pushFreshController(bindings, [
+      runtimeEvent({
+        kind: "usage.updated",
+        payload: {
+          cachedReadTokens: 50,
+          costAmount: 0.001234,
+          costCurrency: "USD",
+          inputTokens: 100,
+          outputTokens: 20,
+          source: "native_step_totals",
+          totalTokens: 170,
+          usageContract: "anthropic_bucketed",
+        },
+        sourceEventId: "usage:native-step-totals",
+      }),
+    ]);
+    await pushFreshController(bindings, completionEvents());
+    expect((await getSessionRunSummary(database, RUN_ID))?.status).toBe("completed");
+    expect(
+      await database
+        .prepare(
+          "SELECT status, input_tokens, output_tokens, total_cost_usd_micros FROM session_model_call",
+        )
+        .first(),
+    ).toEqual({
+      status: "completed",
+      input_tokens: 100,
+      output_tokens: 20,
+      total_cost_usd_micros: 1234,
+    });
+    expect(
+      await database.prepare("SELECT input_tokens, output_tokens FROM usage_event").first(),
+    ).toEqual({ input_tokens: 150, output_tokens: 20 });
+  });
+
   test("acknowledges a replay mixing new and durable events in submission order", async () => {
     const { bindings } = await createCheckpointCompletionFixture();
     const durableEvents = messageEvents({

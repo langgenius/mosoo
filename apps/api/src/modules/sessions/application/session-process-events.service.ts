@@ -94,7 +94,22 @@ function toProcessEventProjectionFromSessionEventRow(
 export function createSessionProcessEventsFromFoldedRows(
   rows: SessionEventProcessRow[],
 ): SessionProcessEvent[] {
-  return finalizeProcessEventDurations(rows.map(toProcessEventProjectionFromSessionEventRow));
+  const projections = rows.map(toProcessEventProjectionFromSessionEventRow);
+  const latestUsage = new Map<SessionRunId, Map<string, ProcessEventProjection>>();
+  for (const [index, row] of rows.entries()) {
+    if (row.run_id === null || row.usage_key == null || row.tokens === null) continue;
+    let calls = latestUsage.get(row.run_id);
+    if (calls === undefined) {
+      calls = new Map();
+      latestUsage.set(row.run_id, calls);
+    }
+    // Usage snapshots replace the same Run/call in the model-call ledger.
+    // Keep their history, but count only the latest snapshot in replay totals.
+    const previous = calls.get(row.usage_key);
+    if (previous !== undefined) previous.event.tokens = null;
+    calls.set(row.usage_key, projections[index]!);
+  }
+  return finalizeProcessEventDurations(projections);
 }
 
 function createProcessEventsTruncatedEvent(input: {

@@ -74,7 +74,7 @@ export const SessionUsageSummarySchema = type({
   "outputTokens?": "number.safe | null",
   "provider?": "string | null",
   "size?": "number.safe | null",
-  source: '"prompt_response" | "session_update"',
+  source: '"native_step_totals" | "prompt_response" | "session_update"',
   "thoughtTokens?": "number.safe | null",
   "totalTokens?": "number.safe | null",
   "usageContract?":

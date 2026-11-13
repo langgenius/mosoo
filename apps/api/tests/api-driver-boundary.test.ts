@@ -30,6 +30,7 @@ import {
 } from "../src/modules/runtime/infrastructure/runtime-boot-token";
 import { buildExecutionSpec } from "../src/modules/runtime/infrastructure/runtime-sandbox-provisioning/runtime-driver-execution-spec.builder";
 import type { RuntimeExecutionSpecBindings } from "../src/modules/runtime/infrastructure/runtime-sandbox-provisioning/runtime-driver-execution-spec.builder";
+import { ensureProvisioningDirectories } from "../src/modules/runtime/infrastructure/runtime-sandbox-provisioning/runtime-driver-files.service";
 import { createInitialSessionLiveState } from "../src/modules/sessions/application/session-live-state.service";
 import type { ApiBindings } from "../src/platform/cloudflare/worker-types";
 import {
@@ -55,21 +56,49 @@ const artifactPaths = {
 };
 
 describe("API to driver boundary", () => {
-  test("OpenCode provisioning does not request unsupported ACP additional directories", async () => {
-    const profile = createDriverProfile();
-    const execution = await buildExecutionSpec(bindings, {
-      builtInTools: [],
-      driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
-      profile: { ...profile, runtimeId: "acp-fallback" },
-      requestUrl: "https://api.example.com/",
-      resolvedMcpServers: [],
-      resolvedSkills: [],
-      resolvedSkillCatalog: [],
-    });
-    expect(execution.session.additionalDirectories).toEqual([]);
-    expect(execution.session.cwd).toBe(profile.session.sessionOrganizationPath);
-    expect(execution.session.context.homePath).toBe(profile.session.homePath);
-  });
+  test.each(["acp-fallback", "pi"] as const)(
+    "keeps %s execution inside its Session without unsupported directory extensions",
+    async (runtimeId) => {
+      const profile = createDriverProfile();
+      const execution = await buildExecutionSpec(bindings, {
+        builtInTools: createDefaultAgentBuiltInTools(),
+        driverInstanceId: API_DRIVER_BOUNDARY_IDS.driverInstance,
+        profile: {
+          ...profile,
+          runtimeId,
+          model: "deepseek-v4.1-flash",
+          provider: "opencode-go",
+          vendorCredential: {
+            ...profile.vendorCredential,
+            vendorId: "opencode-go",
+          },
+        },
+        requestUrl: "https://api.example.com/api/driver/connect",
+        resolvedMcpServers: [],
+        resolvedSkillCatalog: [],
+        resolvedSkills: [],
+      });
+
+      expect(execution.session.additionalDirectories).toEqual([]);
+      expect(execution.session.cwd).toBe(profile.session.sessionOrganizationPath);
+      expect(execution.session.context.homePath).toBe(profile.session.homePath);
+
+      const commands: string[] = [];
+      await ensureProvisioningDirectories(
+        {
+          async exec(command) {
+            commands.push(command);
+            return { exitCode: 0, stderr: "", stdout: "", success: true };
+          },
+        },
+        { ...profile, runtimeId },
+      );
+      expect(commands).toHaveLength(1);
+      expect(commands[0]).toContain("/workspace/cache");
+      expect(commands[0]).toContain(profile.session.homePath);
+      expect(commands[0]).toContain(profile.session.sessionOrganizationPath);
+    },
+  );
 
   test.each(["cattle", "pet"] as const)(
     "requires a committed native checkpoint even when the boot input retains a historical %s label",
