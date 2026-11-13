@@ -13,6 +13,3 @@ tools/dead-code/logs/
 
 # Coding-agent task ledgers are local working state, not repository artifacts.
 progress.md
-
-# git-agent generated files (never track)
-.git-agent/config.local.yml
