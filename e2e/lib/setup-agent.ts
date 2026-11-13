@@ -12,12 +12,8 @@ export function getPreviewSmokeEmail(runId: string): string {
   return process.env["MOSOO_E2E_EMAIL"]?.trim() || `preview-smoke-${runId}@mosoo.ai`;
 }
 
-function getProviderLabelPattern(providerId: PreviewProviderId): RegExp {
-  return providerId === "anthropic"
-    ? /\bAnthropic\b/iu
-    : providerId === "gemini"
-      ? /\bGemini\b/iu
-      : /\bOpenAI\b/iu;
+function getProviderLabel(providerId: PreviewProviderId): string {
+  return providerId === "anthropic" ? "Anthropic" : providerId === "gemini" ? "Gemini" : "OpenAI";
 }
 
 export async function configurePreviewRuntimeModel(
@@ -156,17 +152,90 @@ export async function configureProviderCompanyKey(
   await page.goto("/providers");
   await expect(page.getByRole("heading", { name: "Providers" })).toBeVisible();
 
+  const providerLabel = getProviderLabel(input.providerId);
+  const credentialName = `Preview smoke ${input.runId}`;
   const providerCard = page
     .locator("section")
-    .filter({ has: page.getByRole("heading", { name: getProviderLabelPattern(input.providerId) }) })
-    .filter({ has: page.getByRole("button", { name: "Add Key" }) })
-    .first();
-  await providerCard.getByRole("button", { name: "Add Key" }).click();
-  await providerCard.getByPlaceholder("e.g. Production").fill(`Preview smoke ${input.runId}`);
-  await providerCard.getByPlaceholder("sk-...").fill(input.apiKey);
-  await providerCard.getByLabel("Use as default credential for this provider").check();
-  await providerCard.getByRole("button", { name: "Save" }).click();
-  await expect(providerCard.getByText("Default")).toBeVisible({
-    timeout: 30_000,
+    .filter({ has: page.getByRole("heading", { exact: true, name: providerLabel }) })
+    .filter({ has: page.getByRole("button", { exact: true, name: "Add key" }) });
+  await providerCard.getByRole("button", { exact: true, name: "Add key" }).click();
+  const dialog = page.getByRole("dialog", { exact: true, name: `Add ${providerLabel} key` });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("textbox", { name: "Name", exact: true }).fill(credentialName);
+  await dialog.getByLabel("API key", { exact: true }).fill(input.apiKey);
+  const [createdResponse] = await Promise.all([
+    page.waitForResponse((response) => {
+      if (!response.url().endsWith("/api/graphql")) return false;
+      if (response.request().method() !== "POST" || response.request().postData() === null)
+        return false;
+      const request = response.request().postDataJSON() as {
+        query?: string;
+        variables?: { input?: { name?: string; vendorId?: string } };
+      };
+      return (
+        request.query?.includes("CreateVendorCredential") === true &&
+        request.variables?.input?.name === credentialName &&
+        request.variables.input.vendorId === input.providerId
+      );
+    }),
+    dialog.getByRole("button", { name: "Save", exact: true }).click(),
+  ]);
+  expect(createdResponse.ok()).toBe(true);
+  const created = (await createdResponse.json()) as {
+    data?: {
+      createVendorCredential?: { id: string; isDefault: boolean; name: string; vendorId: string };
+    };
+    errors?: unknown[];
+  };
+  expect(created.errors).toBeUndefined();
+  expect(created.data?.createVendorCredential).toMatchObject({
+    isDefault: expect.any(Boolean),
+    name: credentialName,
+    vendorId: input.providerId,
   });
+  const credential = created.data?.createVendorCredential;
+  if (credential === undefined)
+    throw new Error("Preview credential creation returned no credential.");
+  expect(credential.id).toEqual(expect.any(String));
+  await expect(dialog).toHaveCount(0);
+  const savedCredential = providerCard.locator('[data-slot="connection-row"]').filter({
+    has: page.getByText(credentialName, { exact: true }),
+  });
+  await expect(savedCredential).toBeVisible();
+  const setDefaultButton = savedCredential.getByRole("button", {
+    name: "Set default",
+    exact: true,
+  });
+  if (!credential.isDefault) {
+    const [defaultResponse] = await Promise.all([
+      page.waitForResponse((response) => {
+        if (!response.url().endsWith("/api/graphql")) return false;
+        if (response.request().method() !== "POST" || response.request().postData() === null)
+          return false;
+        const request = response.request().postDataJSON() as {
+          query?: string;
+          variables?: { input?: { id?: string } };
+        };
+        return (
+          request.query?.includes("SetDefaultVendorCredential") === true &&
+          request.variables?.input?.id === credential.id
+        );
+      }),
+      setDefaultButton.click(),
+    ]);
+    expect(defaultResponse.ok()).toBe(true);
+    const selected = (await defaultResponse.json()) as {
+      data?: { setDefaultVendorCredential?: { id: string; isDefault: boolean } };
+      errors?: unknown[];
+    };
+    expect(selected.errors).toBeUndefined();
+    expect(
+      selected.data?.setDefaultVendorCredential,
+      "Preview default credential response must match the saved credential",
+    ).toMatchObject({
+      id: credential.id,
+      isDefault: true,
+    });
+  }
+  await expect(savedCredential.getByText("Default", { exact: true })).toBeVisible();
 }
