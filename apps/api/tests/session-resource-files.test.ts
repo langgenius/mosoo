@@ -550,7 +550,7 @@ describe("session resource files", () => {
     };
     const file = await fileStore.recordRuntimeOutput({
       bindings: createPublicHttpTestBindings(database, {
-        fileBucket: bucket as unknown as R2Bucket,
+        fileBucket: bucket,
       }) as ApiBindings,
       body: new TextEncoder().encode("runtime summary"),
       contentType: "text/markdown",

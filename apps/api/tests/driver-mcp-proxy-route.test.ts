@@ -155,7 +155,7 @@ async function setupFixture(endUserId: string | null = null) {
 
 function captureUpstreamFetch() {
   const captured: { body: string; headers: Headers; method: string; url: string }[] = [];
-  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+  globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const request = new Request(input, init);
     captured.push({
       body: await request.text(),
@@ -164,7 +164,7 @@ function captureUpstreamFetch() {
       url: request.url,
     });
     return Response.json({ id: 1, jsonrpc: "2.0", result: { content: [] } });
-  }) as typeof fetch;
+  };
   return captured;
 }
 

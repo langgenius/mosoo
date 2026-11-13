@@ -71,7 +71,7 @@ function createBindings(): ApiBindings {
     SANDBOX_FILE_BUCKET_LOCAL: "true",
     SANDBOX_STATE_BUCKET: { get: async () => null },
     Sandbox: {},
-  } as unknown as ApiBindings;
+  };
 }
 
 describe("environment package artifact build", () => {
